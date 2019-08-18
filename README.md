@@ -1,12 +1,12 @@
 # Data Grid
 ```<data-grid>``` is a zero-dependency [web component](https://www.webcomponents.org/) written
-in [es6](http://kangax.github.io/compat-table/es6/) to quickly explore large,
-[narrow](https://en.wikipedia.org/wiki/Wide_and_narrow_data), datasets in your browser.
+in [es6](http://kangax.github.io/compat-table/es6/) to quickly explore **large**,
+[narrow](https://en.wikipedia.org/wiki/Wide_and_narrow_data#Narrow), datasets in your browser.
 
 ```<data-grid>``` started as a clean-room reimplementation of
 [PivotTable.js](https://pivottablejs.org/examples/) to explore how
 [Web SQL](https://www.w3.org/TR/webdatabase/) can lift is
-[size limitations](https://github.com/nicolaskrutchen/pivottable/wiki/Frequently-Asked-Questions#input-data-size).
+[size limitations](https://github.com/nicolaskruchten/pivottable/wiki/Frequently-Asked-Questions#input-data-size).
 As a consequence, ```<data-grid>``` only works in browsers that
 [support Web SQL](https://caniuse.com/#feat=sql-storage). Please read
 [this article](https://nolanlawson.com/2014/04/26/web-sql-database-in-memoriam/) if you
