@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Grid Example</title>
+
+    <style>
+        body { font-family: Verdana, Geneva, Tahoma, sans-serif; }
+    </style>
+    <script src="../data_grid/dataGrid.js"></script>
+    <script>
+        const fields = {
+            plate: 'TEXT',
+            state: 'TEXT',
+            license_type: 'TEXT',
+            summons_number: 'INTEGER',
+            issue_date: 'TEXT',
+            violation_time: 'TEXT',
+            violation: 'TEXT',
+            precinct: 'TEXT',
+            county: 'TEXT',
+            issuing_agency: 'TEXT',
+            violation: 'TEXT',
+            amount_type: 'TEXT',
+            value: 'REAL',
+        };
+        const columns = Object.entries(fields).map(([col, type]) => `\`${col}\` ${type}`).join(',');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataGrid = document.querySelector('data-grid');
+            // Get NYC "Open Parking And Camera Violations" open dataset
+            fetch('https://data.cityofnewyork.us/resource/uvbq-3m68.json')
+                .then(response => response.json())
+                .then((data) => {
+                    const { name, database } = dataGrid;
+                    return new Promise((resolve, reject) => database.transaction(
+                        tx => {
+                            tx.executeSql(`DROP TABLE IF EXISTS \`${name}\``);
+                            tx.executeSql(`CREATE TABLE \`${name}\` (${columns})`);
+                        },
+                        reject,
+                        () => resolve(data),
+                    ));
+                })
+                .then((data) => {
+                    const cols = Object.keys(fields);
+                    const shared_cols = cols.filter(col => !['amount_type', 'value'].includes(col));
+                    const amount_cols = ['fine_amount', 'penalty_amount', 'interest_amount', 'reduction_amount'];
+                    // 'melt' data from wide to narrow format
+                    const rows = [];                    
+                    data.forEach((object) => {
+                        const shared = shared_cols.map(col => object[col]);
+                        amount_cols.forEach(amount_col => rows.push(shared.concat([amount_col, object[amount_col]])));
+                    });
+                    return dataGrid.bulkInsert(cols, rows);
+                })
+                .then(() => dataGrid.refresh())
+                .catch(console.error);
+        });
+    </script>
+</head>
+<body>
+    <data-grid data-name="violations" data-db-name="example" data-db-version="1.0" data-db-display-name="Data Grid Example" >
+    </data-grid>
+</body>
+</html>
