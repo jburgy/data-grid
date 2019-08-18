@@ -25,6 +25,7 @@ a ```<script>``` tag. The script registers several custom elements (5 to be prec
 <body>
     <data-grid data-name="myTable" data-db-name="myDatabase"></data-grid>
 </body>
+```
 
 ### Jupyter
 ```<data-grid>``` also ships as an
