@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "data-grid"
+version = "0.1.0"
+description = "Dependency-free pivotable grid as Jupyter widget"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {file = "LICENSE"}
+dependencies = [
+    "ipywidgets>=8.1.7",
+    "jupyter-client>=8.6.3",
+    "notebook>=7.4.3",
+    "traitlets>=5.14.3",
+]
+
+[tool.hatch.build]
+artifacts = [
+    "jupyter-config/**/*.json",
+]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"data_grid" = "share/jupyter/nbextensions/data-grid"
+"jupyter-config" = "etc/jupyter"
