@@ -395,7 +395,7 @@ class DataGridAxis extends HTMLElement {
         const statement = `SELECT \`${attr}\` as value, count(1) as valueCount
         FROM \`${name}\` GROUP BY \`${attr}\` ORDER BY \`${attr}\``;
 
-        const values = [];
+        const rows = [];
         await new Promise((resolve) => promiser('exec', {
             dbId,
             sql: statement,
@@ -403,7 +403,7 @@ class DataGridAxis extends HTMLElement {
                 if (row === undefined && rowNumber === null)
                     resolve()
                 else
-                    values.push(columnNames.reduceRight((obj, key, i) => ({ [key]: vals[i], ...obj }), {}));
+                    rows.push(columnNames.reduceRight((obj, key, i) => ({ [key]: row[i], ...obj }), {}));
             }
         }));
 
@@ -413,16 +413,16 @@ class DataGridAxis extends HTMLElement {
             valueList.setAttribute('slot', 'value-list');
             this.appendChild(valueList);
         }
-        valueList.setAttribute('data-count', `(${values.length})`);
+        valueList.setAttribute('data-count', `(${rows.length})`);
 
-        if (values.length > 5 && !valueList.querySelector('[slot=controls]')) {
+        if (rows.length > 5 && !valueList.querySelector('[slot=controls]')) {
             const controls = document.createElement('filter-search');
             controls.setAttribute('slot', 'controls');
             valueList.appendChild(controls);
         }
 
         valueList.querySelectorAll('[slot=filter-item]').forEach((node) => {
-            if (!values.includes(node.getAttribute('data-value'))) {
+            if (!rows.some(({value}) => value == node.getAttribute('data-value'))) {
                 node.parentNode.remove();
             }
         });
@@ -446,6 +446,8 @@ class DataGridAxis extends HTMLElement {
 
             valueList.insertBefore(filterItem, children[index]);
         });
+
+        return valueList;
     }
 }
 
@@ -542,9 +544,8 @@ class DataGrid extends HTMLElement {
         let { dbId } = this;
         if (!dbId) {
             const openResponse = await promiser(
-                'open', { fileName: `./${this.getAttribute('data-db-name')}.sqlite3?vfs=opfs` }
+                'open', { filename: `/${this.getAttribute('data-db-name')}.sqlite3`, vfs: 'opfs' }
             );
-
             this.dbId = dbId = openResponse.dbId;
         }
 
@@ -643,10 +644,10 @@ class DataGrid extends HTMLElement {
         nodes.forEach((node) => {
             node.addEventListener('dragstart', dragStart, false);
         });
-        const refresh = () => { this.refresh() };
+        const refresh = async () => { await this.refresh(); };
         shadowRoot.querySelector('#aggregator').addEventListener('change', refresh);
         this.addEventListener('refresh', refresh);
-        refresh();
+        await refresh();
         this.dispatchEvent(new Event('component-ready', { bubbles: true, composed: true }));
     }
 

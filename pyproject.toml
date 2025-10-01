@@ -11,8 +11,6 @@ requires-python = ">=3.13"
 license = {file = "LICENSE"}
 dependencies = [
     "ipywidgets>=8.1.7",
-    "jupyter-client>=8.6.3",
-    "notebook>=7.4.3",
     "traitlets>=5.14.3",
 ]
 
@@ -24,3 +22,9 @@ artifacts = [
 [tool.hatch.build.targets.wheel.shared-data]
 "data_grid" = "share/jupyter/nbextensions/data-grid"
 "jupyter-config" = "etc/jupyter"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "pandas>=2.3.3",
+]

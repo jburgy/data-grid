@@ -45,7 +45,7 @@
 
             document.querySelector('data-grid').addEventListener('component-ready', async ({ target }) => {
                 await target.createTable(fields);
-                await target.bulkInsert(Object.keys(fields), rows);
+                await target.bulkInsert(cols, rows);
                 await target.refresh();
             }, { once: true });
         });
