@@ -1,5 +1,0 @@
-{
-  "packageManager": "python",
-  "packageName": "data_grid",
-  "uninstallInstructions": "Use your Python package manager (pip, uv, etc.) to uninstall the package data-grid"
-}

@@ -16,36 +16,15 @@
         "name": "Jan Burgy",
         "email": "jburgy@gmail.com"
     },
-    "files": [
-        "lib/**/*.js",
-        "style/**/*.{css,js}"
-    ],
-    "main": "lib/index.js",
-    "style": "style/index.css",
     "repository": {
         "type": "git",
         "url": "https://github.com/jburgy/data-grid.git"
     },
-    "scripts": {
-        "build": "jlpm build:labextension:dev",
-        "build:prod": "jlpm build:labextension",
-        "build:labextension": "jupyter labextension build .",
-        "build:labextension:dev": "jupyter labextension build --development True ."
+    "devDependencies": {
+        "@anywidget/vite": "^0.2.2",
+        "vite": "^7.1.8"
     },
     "dependencies": {
-        "@jupyter-widgets/base": "^6.0.11",
-        "@jupyterlab/application": "^4.4.9",
         "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
-    },
-    "devDependencies": {
-        "@jupyterlab/builder": "^4.4.9",
-        "vite": "^7.1.7"
-    },
-    "publishConfig": {
-        "access": "public"
-    },
-    "jupyterlab": {
-        "extension": true,
-        "outputDir": "data_grid/labextension"
     }
 }
