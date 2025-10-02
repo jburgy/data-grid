@@ -1,8 +1,51 @@
 {
-  "dependencies": {
-    "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
-  },
-  "devDependencies": {
-    "vite": "^7.1.7"
-  }
+    "name": "data-grid",
+    "version": "0.1.0",
+    "description": "Clean-room reimplementation of PivotTable.js using @sqlite.org/sqlite-wasm",
+    "keywords": [
+        "jupyter",
+        "jupyterlab",
+        "jupyterlab-extension"
+    ],
+    "homepage": "https://github.com/jburgy/data-grid",
+    "bugs": {
+        "url": "https://github.com/jburgy/data-grid/issues"
+    },
+    "license": "BSD-3-Clause",
+    "author": {
+        "name": "Jan Burgy",
+        "email": "jburgy@gmail.com"
+    },
+    "files": [
+        "lib/**/*.js",
+        "style/**/*.{css,js}"
+    ],
+    "main": "lib/index.js",
+    "style": "style/index.css",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jburgy/data-grid.git"
+    },
+    "scripts": {
+        "build": "jlpm build:labextension:dev",
+        "build:prod": "jlpm build:labextension",
+        "build:labextension": "jupyter labextension build .",
+        "build:labextension:dev": "jupyter labextension build --development True ."
+    },
+    "dependencies": {
+        "@jupyter-widgets/base": "^6.0.11",
+        "@jupyterlab/application": "^4.4.9",
+        "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
+    },
+    "devDependencies": {
+        "@jupyterlab/builder": "^4.4.9",
+        "vite": "^7.1.7"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "jupyterlab": {
+        "extension": true,
+        "outputDir": "data_grid/labextension"
+    }
 }

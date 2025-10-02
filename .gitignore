@@ -4,6 +4,9 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
+.ipynb_checkpoints
+*.tsbuildinfo
+data_grid/labextension
 
 # Local History for Visual Studio Code
 .history/
@@ -11,8 +14,12 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Distribution / packaging
+dist/
 
 node_modules
 package-lock.json
+
+# Yarn cache
+.yarn/
+

@@ -14,17 +14,46 @@ dependencies = [
     "traitlets>=5.14.3",
 ]
 
-[tool.hatch.build]
-artifacts = [
-    "jupyter-config/**/*.json",
-]
-
-[tool.hatch.build.targets.wheel.shared-data]
-"data_grid" = "share/jupyter/nbextensions/data-grid"
-"jupyter-config" = "etc/jupyter"
-
 [dependency-groups]
 dev = [
+    "ipywidgets>=8.1.7",
     "jupyter>=1.1.1",
+    "jupyterlite-core>=0.6.4",
+    "jupyterlite-pyodide-kernel>=0.6.1",
     "pandas>=2.3.3",
 ]
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["data_grid/labextension"]
+exclude = [".github", "binder"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"data_grid/labextension" = "share/jupyter/labextensions/data-grid"
+"install.json" = "share/jupyter/labextensions/data-grid/install.json"
+
+[tool.hatch.build.hooks.jupyter-builder]
+dependencies = ["hatch-jupyter-builder>=0.5"]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "data_grid/labextension/static/style.js",
+    "data_grid/labextension/package.json",
+]
+skip-if-exists = ["data_grid/labextension/static/style.js"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+build_cmd = "build:prod"
+npm = ["jlpm"]
+
+[tool.jupyter-releaser.options]
+version_cmd = "hatch version"
+
+[tool.jupyter-releaser.hooks]
+before-build-npm = [
+    "python -m pip install 'jupyterlab>=4.0.0,<5'",
+    "jlpm",
+    "jlpm build:prod"
+]
+before-build-python = ["jlpm clean:all"]
+
+[tool.check-wheel-contents]
+ignore = ["W002"]
