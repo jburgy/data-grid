@@ -16,8 +16,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "jupyterlab>=4.4.9",
-    "jupyterlite-core>=0.6.4",
-    "jupyterlite-pyodide-kernel>=0.6.1",
     "pandas>=2.3.3",
     "watchfiles>=1.1.0",
 ]
@@ -26,10 +24,19 @@ dev = [
 only-packages = true
 artifacts = ["src/data_grid/static/*"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/data_grid"]
+
 [tool.hatch.build.hooks.jupyter-builder]
 build-function = "hatch_jupyter_builder.npm_builder"
-ensured-targets = ["src/data_grid/static/widget.js"]
-skip-if-exists = ["src/data_grid/static/widget.js"]
+ensured-targets = [
+    "src/data_grid/static/sqlite3-worker1-bundler-friendly.js",
+    "src/data_grid/static/widget.js",    
+]
+skip-if-exists = [
+    "src/data_grid/static/sqlite3-worker1-bundler-friendly.js",
+    "src/data_grid/static/widget.js",
+]
 dependencies = ["hatch-jupyter-builder>=0.5.0"]
 
 [tool.hatch.build.hooks.jupyter-builder.build-kwargs]

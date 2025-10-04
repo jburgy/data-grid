@@ -1,4 +1,7 @@
-function view(model) {
+import './dataGrid.js';
+import './widget.css';
+
+function render({ model, el}) {
     const dataGrid = document.createElement('data-grid');
     dataGrid.setAttribute('data-name', model.get('table'));
     dataGrid.setAttribute('data-db-name', model.get('db'));
@@ -46,10 +49,7 @@ function view(model) {
                 this.dataGrid.refresh();
             });
         });
-    return dataGrid;
-}
 
-function render({ model}) {
     el.appendChild(view(model));
     // initial model can only be synchronized _after_ the table has rendered
     new MutationObserver((mutations, observer) => {
@@ -62,7 +62,7 @@ function render({ model}) {
                 .forEach(trait => model.trigger(`change:${trait}`, model, model.get('trait'), {}));
             observer.disconnect();
         }
-    }).observe(this.dataGrid, { childList: true });
+    }).observe(dataGrid, { childList: true });
 }
 
 export default { render };
