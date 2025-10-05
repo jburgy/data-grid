@@ -50,7 +50,7 @@ function render({ model, el}) {
             });
         });
 
-    el.appendChild(view(model));
+    el.appendChild(dataGrid);
     // initial model can only be synchronized _after_ the table has rendered
     new MutationObserver((mutations, observer) => {
         const rendered = mutations

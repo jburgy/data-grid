@@ -21,15 +21,12 @@
         "url": "https://github.com/jburgy/data-grid.git"
     },
     "scripts": {
-        "dev": "npm run build -- --sourcemap=inline --watch",
-        "build": "node esbuild.config.mjs"
+        "dev": "npx vite",
+        "build": "npx vite build"
     },
     "devDependencies": {
         "@anywidget/vite": "^0.2.2",
-        "@chialab/esbuild-plugin-meta-url": "^0.19.0",
-        "@chialab/esbuild-plugin-worker": "^0.19.0",
-        "esbuild": "^0.25.10",
-        "vite": "^7.1.8"
+        "vite": "^7.1.9"
     },
     "dependencies": {
         "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
