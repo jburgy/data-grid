@@ -5,6 +5,7 @@ function render({ model, el}) {
     const dataGrid = document.createElement('data-grid');
     dataGrid.setAttribute('data-name', model.get('table'));
     dataGrid.setAttribute('data-db-name', model.get('db'));
+    dataGrid.setAttribute('data-source', model.get('source'));
     const getNames = target => Array.from(target.assignedNodes(), node => node.getAttribute('data-name'));
 
     const { shadowRoot } = dataGrid;
@@ -20,7 +21,7 @@ function render({ model, el}) {
                     return; // don't notify ondragover
                 }
                 model.set(trait, names);
-                this.touch();
+                model.save_changes();
             });
 
             // listen to model.row_axis or model.col_axis changes
@@ -28,7 +29,8 @@ function render({ model, el}) {
                 return;
             }
 
-            model.on(`change:${trait}`, (_model, currentChange) => {
+            model.on(`change:${trait}`, () => {
+                const currentChange = model.get(trait);
                 if (!indexedDB.cmp(getNames(slotNode), currentChange)) {
                     return; // already consistent
                 }
@@ -40,29 +42,29 @@ function render({ model, el}) {
                 // then, move nodes matching names to the current slot
                 // (but don't create new <data-grid-axis> nodes)
                 currentChange.forEach((name) => {
-                    const node = this.dataGrid.querySelector(`data-grid-axis[data-name="${name}"]`);
+                    const node = dataGrid.querySelector(`data-grid-axis[data-name="${name}"]`);
                     if (node) {
                         node.setAttribute('slot', slot);
                     }
                 });
 
-                this.dataGrid.refresh();
+                dataGrid.refresh();
             });
         });
 
     el.appendChild(dataGrid);
-    // initial model can only be synchronized _after_ the table has rendered
-    new MutationObserver((mutations, observer) => {
-        const rendered = mutations
-            .some(({ addedNodes }) => Array
-                .from(addedNodes, ({ nodeName }) => nodeName === 'PIVOT-TABLE')
-                .some(x => x));
-        if (rendered) {
-            ['col_axis', 'row_axis']
-                .forEach(trait => model.trigger(`change:${trait}`, model, model.get('trait'), {}));
-            observer.disconnect();
-        }
-    }).observe(dataGrid, { childList: true });
+    // // initial model can only be synchronized _after_ the table has rendered
+    // new MutationObserver((mutations, observer) => {
+    //     const rendered = mutations
+    //         .some(({ addedNodes }) => Array
+    //             .from(addedNodes, ({ nodeName }) => nodeName === 'PIVOT-TABLE')
+    //             .some(x => x));
+    //     if (rendered) {
+    //         ['col_axis', 'row_axis']
+    //             .forEach(trait => model.trigger(`change:${trait}`, model, model.get('trait'), {}));
+    //         observer.disconnect();
+    //     }
+    // }).observe(dataGrid, { childList: true });
 }
 
 export default { render };

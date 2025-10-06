@@ -1,7 +1,5 @@
 import { sqlite3Worker1Promiser } from '@sqlite.org/sqlite-wasm';
 
-/* eslint-disable no-console,object-curly-newline */
-
 const promiser = await new Promise((resolve) => {
     const _promiser = sqlite3Worker1Promiser({
         onready: () => resolve(_promiser),
@@ -543,8 +541,20 @@ class DataGrid extends HTMLElement {
     async initialize() {
         let { dbId } = this;
         if (!dbId) {
+            const filename = `/${this.getAttribute('data-db-name')}.sqlite3`;
+            const sourceUrl = this.getAttribute('data-source');
+            if (sourceUrl) {
+                const response = await fetch(sourceUrl);
+                const data = await response.json();  // quirk of /api/contents
+
+                const opfsRoot = await navigator.storage.getDirectory();
+                const fileHandle = await opfsRoot.getFileHandle(filename.slice(1), {create: true});
+                const writable = await fileHandle.createWritable();
+                await writable.write(Uint8Array.fromBase64(data.content), {position: 0});
+                await writable.close();
+            }
             const openResponse = await promiser(
-                'open', { filename: `/${this.getAttribute('data-db-name')}.sqlite3`, vfs: 'opfs' }
+                'open', { filename: filename, vfs: 'opfs' }
             );
             this.dbId = dbId = openResponse.dbId;
         }
