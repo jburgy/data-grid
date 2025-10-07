@@ -1,2 +1,26 @@
-__pycache__
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
 .ipynb_checkpoints
+*.tsbuildinfo
+data_grid/labextension
+
+# Local History for Visual Studio Code
+.history/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+src/data_grid/static/
+
+# Distribution / packaging
+dist/
+
+node_modules
+package-lock.json
+
+# Yarn cache
+.yarn/
+

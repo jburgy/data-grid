@@ -1,0 +1,34 @@
+{
+    "name": "data-grid",
+    "version": "0.1.0",
+    "description": "Clean-room reimplementation of PivotTable.js using @sqlite.org/sqlite-wasm",
+    "keywords": [
+        "jupyter",
+        "jupyterlab",
+        "jupyterlab-extension"
+    ],
+    "homepage": "https://github.com/jburgy/data-grid",
+    "bugs": {
+        "url": "https://github.com/jburgy/data-grid/issues"
+    },
+    "license": "BSD-3-Clause",
+    "author": {
+        "name": "Jan Burgy",
+        "email": "jburgy@gmail.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jburgy/data-grid.git"
+    },
+    "scripts": {
+        "dev": "npx vite",
+        "build": "npx vite build"
+    },
+    "devDependencies": {
+        "@anywidget/vite": "^0.2.2",
+        "vite": "^7.1.9"
+    },
+    "dependencies": {
+        "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
+    }
+}
