@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import anywidget from "@anywidget/vite";
 
 export default defineConfig({
+	base: "/data-grid/",
 	build: {
 		outDir: "src/data_grid/static",
 		lib: {
