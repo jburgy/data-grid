@@ -29,8 +29,6 @@
         "vite": "^7.1.9"
     },
     "dependencies": {
-        "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
-        "coi-serviceworker": "^0.1.7",
-        "register-service-worker": "^1.7.2"
+        "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
     }
 }
