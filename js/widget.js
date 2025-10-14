@@ -1,9 +1,5 @@
 import './dataGrid.js';
 import './widget.css';
-import { register } from 'register-service-worker';
-
-register(new URL('coi-serviceworker/coi-serviceworker.js', import.meta.url));
-
 
 /**
  * @param {Node[]} target 
