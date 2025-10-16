@@ -734,12 +734,12 @@ class DataGrid extends HTMLElement {
                     resolve(new PivotTable({ colAttrs, colKeys, rowAttrs, rowKeys, values }));
                     return;
                 }
-                const rowKey = rowAttrs.length ? rowAttrs.map(attr => row[columnNames.indexOf(attr)]) : ['Totals'];
+                const rowKey = rowAttrs.length ? rowAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
                 if (!rowKeys.length || indexedDB.cmp(rowKey, rowKeys[rowKeys.length - 1])) {
                     rowKeys.push(rowKey);
                     values.push([]);
                 }
-                const colKey = colAttrs.length ? colAttrs.map(attr => row[columnNames.indexOf(attr)]) : ['Totals'];
+                const colKey = colAttrs.length ? colAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
                 const index = colKeys.findIndex(key => indexedDB.cmp(key, colKey) > -1);
                 if (index === -1) {
                     colKeys.push(colKey);
