@@ -26,7 +26,7 @@
     },
     "devDependencies": {
         "@anywidget/vite": "^0.2.2",
-        "vite": "^7.1.9"
+        "vite": "^7.1.11"
     },
     "dependencies": {
         "@sqlite.org/sqlite-wasm": "^3.50.4-build1"
