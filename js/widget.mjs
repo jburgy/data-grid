@@ -1,4 +1,4 @@
-import './dataGrid.js';
+import './dataGrid.mjs';
 import './widget.css';
 
 /**
