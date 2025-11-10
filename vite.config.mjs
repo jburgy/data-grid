@@ -6,7 +6,7 @@ export default defineConfig({
 	build: {
 		outDir: "src/data_grid/static",
 		lib: {
-			entry: ["js/widget.js"],
+			entry: ["js/widget.mjs"],
 			formats: ["es"],
 		},
 	},
