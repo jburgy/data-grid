@@ -230,7 +230,7 @@ class DataGrid extends HTMLElement {
         const bind = [];
         const clauses = Object.entries(filters).map(([attr, values]) => {
             if (!values.length) {
-                return '0 = 1'; // every value excluded; `IN ()` is a syntax error
+                return '0 = 1'; // SQLite tolerates `IN ()`, but nothing else does
             }
             bind.push(...values);
             return `${quoteIdent(attr)} IN (${values.map(() => '?').join(', ')})`;

@@ -18,6 +18,10 @@ src/data_grid/static/
 # Distribution / packaging
 dist/
 
+# Playwright
+playwright-report/
+test-results/
+
 node_modules
 
 # Yarn cache

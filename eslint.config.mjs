@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-    { ignores: ['src/data_grid/static/**', 'dist/**'] },
+    { ignores: ['src/data_grid/static/**', 'dist/**', 'playwright-report/**', 'test-results/**'] },
     js.configs.recommended,
     {
         files: ['js/**/*.mjs'],
@@ -22,6 +22,18 @@ export default [
             ecmaVersion: 'latest',
             sourceType: 'module',
             globals: globals.node,
+        },
+        rules: {
+            indent: ['error', 4],
+        },
+    },
+    {
+        // Specs run in node, but their page.evaluate callbacks run in the browser.
+        files: ['e2e/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: { ...globals.node, ...globals.browser },
         },
         rules: {
             indent: ['error', 4],

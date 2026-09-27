@@ -24,11 +24,14 @@
         "dev": "npx vite",
         "build": "npx vite build",
         "lint": "npx eslint .",
-        "test": "npx vitest run"
+        "test": "npm run test:unit && npm run test:e2e",
+        "test:unit": "npx vitest run",
+        "test:e2e": "npx playwright test"
     },
     "devDependencies": {
         "@anywidget/vite": "^0.2.2",
         "@eslint/js": "^10.0.1",
+        "@playwright/test": "^1.63.0",
         "eslint": "^10.11.0",
         "globals": "^17.12.0",
         "vite": "^7.3.2",
