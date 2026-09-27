@@ -16,8 +16,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -35,6 +35,15 @@ jobs:
             test-results/
           retention-days: 7
       - run: npm run build
+
+      # DataGridWidget._esm points at the bundle above, so the package cannot be
+      # imported until it exists.  Without this, nothing verified uv.lock at all.
+      - uses: astral-sh/setup-uv@v10.2.0 # no moving major tag is published
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --no-sync python -c "from data_grid import DataGridWidget; DataGridWidget(table='t', db='d')"
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: src/data_grid/static

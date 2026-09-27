@@ -15,9 +15,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "jupyterlab>=4.4.9",
+    # Imported by examples/dataGrid.ipynb to build example.db.
     "pandas>=2.3.3",
-    "watchfiles>=1.1.0",
 ]
 
 [tool.hatch.build]
