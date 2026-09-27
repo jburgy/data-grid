@@ -25,9 +25,8 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - run: npm run build
-      # The `demo` playwright project runs against the built demo site, so it has
-      # to exist before the e2e run.
-      - run: npm run build:demo
+      # test:e2e builds the demo itself, so dist-demo exists by the time the
+      # Pages artifact is uploaded below.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7

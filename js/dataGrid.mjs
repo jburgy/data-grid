@@ -104,6 +104,11 @@ class DataGrid extends HTMLElement {
             const filename = `${this.dataset.dbName}.sqlite3`;
             const sourceUrl = this.dataset.source;
             if (sourceUrl) {
+                if (vfs !== 'opfs') {
+                    // The download lands in OPFS; any other VFS would open an
+                    // unrelated empty database and ignore it.
+                    throw new Error(`data-source requires data-vfs="opfs", got "${vfs}"`);
+                }
                 const response = await fetch(sourceUrl);
                 const data = await response.json();  // quirk of /api/contents
 

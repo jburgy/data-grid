@@ -365,3 +365,24 @@ test('prunes axes when the table is replaced by one with no axis columns', async
     expect(after).toEqual([]);
     expect(errors).toEqual([]);
 });
+
+test('refuses data-source unless the VFS is opfs', async ({ page }) => {
+    await openFixture(page);
+
+    // data-source downloads into OPFS, so any other VFS would open an unrelated
+    // empty database and silently drop the download.
+    const message = await page.evaluate(async () => {
+        const grid = document.createElement('data-grid');
+        grid.dataset.name = 'violations';
+        grid.dataset.dbName = 'sourced';
+        grid.dataset.source = '/does-not-matter.json';
+        grid.dataset.vfs = 'memdb';
+        try {
+            await grid.initialize();
+            return '<resolved>';
+        } catch (error) {
+            return error.message;
+        }
+    });
+    expect(message).toBe('data-source requires data-vfs="opfs", got "memdb"');
+});
