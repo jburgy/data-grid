@@ -26,7 +26,7 @@ jobs:
       - run: npm run test:unit
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
@@ -44,7 +44,7 @@ jobs:
       - run: uv sync --locked
       - run: uv run --no-sync python -c "from data_grid import DataGridWidget; DataGridWidget(table='t', db='d')"
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: src/data_grid/static
 
@@ -61,6 +61,6 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
         
