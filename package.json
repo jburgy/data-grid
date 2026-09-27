@@ -34,7 +34,7 @@
         "@playwright/test": "^1.63.0",
         "eslint": "^10.11.0",
         "globals": "^17.12.0",
-        "vite": "^7.3.2",
+        "vite": "^7.3.6",
         "vitest": "^5.0.2"
     },
     "dependencies": {
