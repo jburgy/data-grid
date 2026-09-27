@@ -11,6 +11,16 @@ Unfortunately, Web SQL was [deprecated](https://developer.chrome.com/blog/deprec
 so ```<data-grid>``` now depends on [`@sqlite.org/sqlite-wasm`](http://sqlite.org/wasm)
 thanks to the magic of [WebAssembly](https://webassembly.org/).
 
+### Browser requirements
+```<data-grid>``` stores its database in the
+[Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system),
+which sqlite-wasm reaches through `SharedArrayBuffer`. The page must therefore be
+served [cross-origin isolated](https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated)
+(`Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`).
+Loading a database from `data-source` additionally uses
+[`Uint8Array.fromBase64`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/fromBase64),
+which needs Chrome 133, Firefox 133 or Safari 18.2.
+
 ## Using Data Grid
 ### HTML5
 ```<data-grid>``` consists of a single

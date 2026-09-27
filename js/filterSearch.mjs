@@ -37,7 +37,7 @@ export class FilterSearch extends HTMLElement {
         search.addEventListener('keyup', ({ target: { value } }) => {
             const filter = value.toLowerCase().trim();
 
-            const nodes = valueList.querySelectorAll('[slot=filter-item] #value');
+            const nodes = valueList.querySelectorAll('[slot=filter-item] .value');
             nodes.forEach((node) => {
                 const { style } = node.closest('[slot=filter-item]');
                 const textContent = node.textContent.toLowerCase();

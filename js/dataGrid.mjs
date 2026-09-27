@@ -1,4 +1,4 @@
-import { promiser } from './db.mjs';
+import { exec, promiser, query, quoteIdent } from './db.mjs';
 import { template } from './template.mjs';
 import { PivotTable } from './pivotTable.mjs';
 import { FilterSearch } from './filterSearch.mjs';
@@ -73,57 +73,48 @@ class DataGrid extends HTMLElement {
 
     async createTable(fields) {
         const { name, dbId } = this;
-        const colDefs = Object.entries(fields).map(([col, type]) => `\`${col}\` ${type}`).join(',');
-        await promiser('exec', { dbId, sql: `DROP TABLE IF EXISTS \`${name}\`` });
-        await promiser('exec', { dbId, sql: `CREATE TABLE \`${name}\` (${colDefs})` });
+        const colDefs = Object.entries(fields)
+            .map(([col, type]) => `${quoteIdent(col)} ${type}`)
+            .join(',');
+        await exec(dbId, `DROP TABLE IF EXISTS ${quoteIdent(name)}`);
+        await exec(dbId, `CREATE TABLE ${quoteIdent(name)} (${colDefs})`);
     }
 
-    schema() {
+    /** `[{ name, type }]`, or `[]` when the table does not exist yet. */
+    async columns() {
         const { name, dbId } = this;
-        const checkExistence = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?";
-
-        return new Promise((resolve) =>
-            promiser('exec', {
-                dbId,
-                sql: checkExistence,
-                bind: [name],
-                callback({ row, columnNames }) {
-                    resolve(row ? row[columnNames.indexOf('sql')] : null)
-                },
-            })
-        );
+        const { rows } = await query(dbId, `PRAGMA table_info(${quoteIdent(name)})`);
+        return rows.map(([, column, type]) => ({ name: column, type: type.toUpperCase() }));
     }
 
     async initialize() {
         let { dbId } = this;
         if (!dbId) {
-            const filename = `/${this.getAttribute('data-db-name')}.sqlite3`;
+            const filename = `${this.getAttribute('data-db-name')}.sqlite3`;
             const sourceUrl = this.getAttribute('data-source');
             if (sourceUrl) {
                 const response = await fetch(sourceUrl);
                 const data = await response.json();  // quirk of /api/contents
 
                 const opfsRoot = await navigator.storage.getDirectory();
-                const fileHandle = await opfsRoot.getFileHandle(filename.slice(1), { create: true });
+                const fileHandle = await opfsRoot.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(Uint8Array.fromBase64(data.content), { position: 0 });
                 await writable.close();
             }
             const openResponse = await promiser(
-                'open', { filename: filename, vfs: 'opfs' }
+                'open', { filename: `/${filename}`, vfs: 'opfs' }
             );
             this.dbId = dbId = openResponse.dbId;
         }
 
-        const sql = await this.schema();
-        if (!sql)
+        // Every non-REAL column is an axis; the REAL `value` column is the measure.
+        const attrValues = (await this.columns())
+            .filter(({ type }) => type !== 'REAL')
+            .map(({ name }) => name);
+        if (!attrValues.length)
             return this;
 
-        const [cols] = sql.replace(/\n/g, '').match(/(?<=\().*?(?=\))/);
-        const attrValues = cols
-            .split(/,\s*/)
-            .filter(typedCol => !typedCol.endsWith('REAL'))
-            .map(typedCol => typedCol.match(/(?<=[`"]).*?(?=[`"])/)[0]);
         const axes = this.querySelectorAll('data-grid-axis');
         axes.forEach((axis) => {
             if (!attrValues.includes(axis.getAttribute('data-name'))) {
@@ -227,17 +218,16 @@ class DataGrid extends HTMLElement {
         const filters = {};
         const valueLists = this.querySelectorAll('[slot=value-list]');
         valueLists.forEach((valueList) => {
-            const checkBoxes = valueList.querySelectorAll('[type=checkbox]');
-            const checkMarks = Array.from(checkBoxes, ({ checked }) => checked);
-
-            if (!checkMarks.every(checked => checked)) {
-                filters[valueList.getAttribute('data-name')] = Array
-                    .from(checkBoxes, node => node.getAttribute('data-filter'))
-                    .filter((_, i) => checkMarks[i]);
+            const checkBoxes = Array.from(valueList.querySelectorAll('[type=checkbox]'));
+            if (checkBoxes.every(({ checked }) => checked)) {
+                return; // nothing excluded, so no WHERE clause needed
             }
+            filters[valueList.getAttribute('data-name')] = checkBoxes
+                .filter(({ checked }) => checked)
+                .map(({ filterValue }) => filterValue);
         });
 
-        if (!await this.schema())
+        if (!(await this.columns()).length)
             return this;
         const table = await this.pivotTable({ colAttrs, rowAttrs, aggregator, filters });
         const lastChild = this.querySelector('[slot=render-area]')
@@ -256,27 +246,35 @@ class DataGrid extends HTMLElement {
         const SQLITE_MAX_VARIABLE_NUMBER = 999;
         const batchSize = Math.floor(SQLITE_MAX_VARIABLE_NUMBER / columns.length);
         const first = `(?${',?'.repeat(columns.length - 1)})`;
-        const next = `,${first}`;
-        const insert = `INSERT INTO \`${name}\` (${columns.map(col => `\`${col}\``).join(',')}) VALUES ${first}`;
+        const colList = columns.map(quoteIdent).join(',');
+        const insert = `INSERT INTO ${quoteIdent(name)} (${colList}) VALUES ${first}`;
 
-        while (true) {
-            const batch = rows.splice(0, batchSize);
-            const { length } = batch;
-            if (!length)
-                break;
-            await promiser('exec', { dbId, sql: `${insert}${next.repeat(length - 1)}`, bind: batch.flat() });
+        for (let start = 0; start < rows.length; start += batchSize) {
+            const batch = rows.slice(start, start + batchSize);
+            const sql = `${insert}${`,${first}`.repeat(batch.length - 1)}`;
+            await exec(dbId, sql, batch.flat());
         }
         await this.initialize();
     };
 
     pivotTable({ rowAttrs, colAttrs, aggregator, filters }) {
         const { name, dbId } = this;
-        const attrs = rowAttrs.concat(colAttrs).map(attr => `\`${attr}\``).join(', ');
-        const filter = Object.entries(filters)
-            .reduce((a, [attr, values]) => `${a} AND \`${attr}\` IN (${values.join(', ')})`, '1 = 1');
+        const attrs = rowAttrs.concat(colAttrs).map(quoteIdent).join(', ');
+
+        const bind = [];
+        const clauses = Object.entries(filters).map(([attr, values]) => {
+            if (!values.length) {
+                return '0 = 1'; // every value excluded; `IN ()` is a syntax error
+            }
+            bind.push(...values);
+            return `${quoteIdent(attr)} IN (${values.map(() => '?').join(', ')})`;
+        });
+        const where = clauses.length ? clauses.join(' AND ') : '1 = 1';
+
+        const aggregate = `${aggregator}(value) AS value`;
         const selectStatement = attrs.length
-            ? `SELECT ${attrs}, ${aggregator}(value) AS value FROM \`${name}\` WHERE ${filter} GROUP BY ${attrs} ORDER BY ${attrs}`
-            : `SELECT ${aggregator}(value) AS value FROM \`${name}\` WHERE ${filter}`;
+            ? `SELECT ${attrs}, ${aggregate} FROM ${quoteIdent(name)} WHERE ${where} GROUP BY ${attrs} ORDER BY ${attrs}`
+            : `SELECT ${aggregate} FROM ${quoteIdent(name)} WHERE ${where}`;
 
         const rowKeys = [];
         const colKeys = [];
@@ -285,9 +283,12 @@ class DataGrid extends HTMLElement {
         return new Promise((resolve) => promiser('exec', {
             dbId: dbId,
             sql: selectStatement,
+            bind,
             callback({ row, rowNumber, columnNames }) {
                 if (row === undefined && rowNumber === null) {
-                    resolve(new PivotTable({ colAttrs, colKeys, rowAttrs, rowKeys, values }));
+                    const table = document.createElement('pivot-table');
+                    table.render({ colAttrs, colKeys, rowAttrs, rowKeys, values });
+                    resolve(table);
                     return;
                 }
                 const rowKey = rowAttrs.length ? rowAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];

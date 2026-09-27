@@ -47,14 +47,16 @@ const spanSize = (data, i, j) => {
 
 // see https://github.com/nicolaskrutchen/pivottable/tree/master/src/pivot.coffee#pivotTableRenderer
 export class PivotTable extends HTMLElement {
-    constructor({ colAttrs, colKeys, rowAttrs, rowKeys, values }) {
+    constructor() {
         super();
 
         this.attachShadow({ mode: 'open' })
             .appendChild(pivotTableTemplate.cloneNode(true));
+    }
 
+    render({ colAttrs, colKeys, rowAttrs, rowKeys, values }) {
         const table = this.shadowRoot.querySelector('table');
-        const tHead = table.querySelector('thead');
+        const tHead = table.tHead;
 
         // the first few rows are for column headers
         colAttrs.forEach((c, j) => {
@@ -102,7 +104,7 @@ export class PivotTable extends HTMLElement {
         }
 
         // now the actual data rows, with their row headers and totals
-        const body = document.createElement('tbody');
+        const body = table.tBodies[0];
         rowKeys.forEach((rowKey, i) => {
             const row = body.insertRow();
             rowKey.forEach((txt, j) => {
@@ -122,13 +124,15 @@ export class PivotTable extends HTMLElement {
                 const value = values[i][j];
                 const cell = row.insertCell();
                 cell.classList.add('val', `row${i}`, `col${j}`);
+                if (value === undefined || value === null) {
+                    return;
+                }
                 cell.textContent = Number.isFinite(value)
                     ? value.toFixed(0).replace(/\d{1,3}(?=(\d{3})+(?!\d))/g, '$&,')
                     : value;
                 cell.setAttribute('data-value', value);
             });
         });
-        table.appendChild(body);
         return this;
     }
 }
