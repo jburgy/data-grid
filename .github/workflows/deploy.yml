@@ -24,9 +24,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test:unit
-      - run: npm run build
-      # test:e2e builds the demo itself, so dist-demo exists by the time the
-      # Pages artifact is uploaded below.
+      # test:e2e -> build:demo -> build, so the widget bundle and the demo site
+      # are both produced here; building again separately would be duplication.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7
