@@ -96,8 +96,7 @@ class DataGrid extends HTMLElement {
     }
 
     async initialize() {
-        let { dbId } = this;
-        if (!dbId) {
+        if (!this.dbId) {
             const filename = `${this.dataset.dbName}.sqlite3`;
             const sourceUrl = this.dataset.source;
             if (sourceUrl) {
@@ -113,7 +112,7 @@ class DataGrid extends HTMLElement {
             const openResponse = await promiser(
                 'open', { filename: `/${filename}`, vfs: 'opfs' }
             );
-            this.dbId = dbId = openResponse.dbId;
+            this.dbId = openResponse.dbId;
         }
 
         // Every non-REAL column is an axis; the REAL `value` column is the measure.

@@ -83,7 +83,7 @@ export class FilterBox extends HTMLElement {
             const changed = this.querySelectorAll('.changed');
             changed.forEach((node) => {
                 node.classList.remove('changed');
-                node.checked = !node.checked; // eslint-disable-line no-param-reassign
+                node.checked = !node.checked;
             });
             this.closeFilterBox();
         });

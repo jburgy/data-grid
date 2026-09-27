@@ -19,7 +19,6 @@ src/data_grid/static/
 dist/
 
 node_modules
-package-lock.json
 
 # Yarn cache
 .yarn/
