@@ -2,7 +2,15 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-    { ignores: ['src/data_grid/static/**', 'dist/**', 'playwright-report/**', 'test-results/**'] },
+    {
+        ignores: [
+            '.venv/**', // a synced virtualenv ships plenty of its own JS
+            'src/data_grid/static/**',
+            'dist/**',
+            'playwright-report/**',
+            'test-results/**',
+        ],
+    },
     js.configs.recommended,
     {
         files: ['js/**/*.mjs'],

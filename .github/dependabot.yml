@@ -1,0 +1,50 @@
+version: 2
+
+# Almost everything Dependabot can see in this repo is a *dev-only, transitive*
+# dependency: the published wheel declares only `anywidget`, and the only
+# runtime JS dependency is `@sqlite.org/sqlite-wasm`.  The rest is vite's
+# dependency closure, which never reaches a user of this package.
+#
+# The Python side was the loud one until jupyterlab stopped being a locked dev
+# dependency (see pyproject.toml): it alone accounted for 69 of 102 locked
+# packages and for every open security alert.  What remains is grouped so that
+# an ecosystem produces one PR rather than one per package.  Nothing is ignored
+# or silenced -- `open-pull-requests-limit` is deliberately not used for this,
+# since it does not apply to security updates at all.
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      python:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      javascript-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      javascript:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
