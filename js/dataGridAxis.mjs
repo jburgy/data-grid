@@ -87,7 +87,7 @@ export class DataGridAxis extends HTMLElement {
     }
 
     async valueList() {
-        const attr = this.getAttribute('data-name');
+        const attr = this.dataset.name;
         const dataGrid = this.closest('data-grid');
         const { name, dbId } = dataGrid;
         const column = quoteIdent(attr);
@@ -98,11 +98,11 @@ export class DataGridAxis extends HTMLElement {
 
         const valueList = this.querySelector('filter-box') || document.createElement('filter-box');
         if (!valueList.hasAttribute('slot')) {
-            valueList.setAttribute('data-name', attr);
+            valueList.dataset.name = attr;
             valueList.setAttribute('slot', 'value-list');
             this.appendChild(valueList);
         }
-        valueList.setAttribute('data-count', `(${rows.length})`);
+        valueList.dataset.count = `(${rows.length})`;
 
         if (rows.length > 5 && !valueList.querySelector('[slot=controls]')) {
             const controls = document.createElement('filter-search');

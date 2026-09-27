@@ -1,4 +1,5 @@
-import { exec, promiser, query, quoteIdent } from './db.mjs';
+import { exec, query, promiser, quoteIdent } from './db.mjs';
+import { installDragAndDrop } from './dragDrop.mjs';
 import { template } from './template.mjs';
 import { PivotTable } from './pivotTable.mjs';
 import { FilterSearch } from './filterSearch.mjs';
@@ -59,6 +60,13 @@ const dataGridTemplate = template`
     </tbody>
 </table>`;
 
+/**
+ * A pivot view over one narrow table.
+ *
+ * The table must hold a REAL column named `value` -- the measure fed to the
+ * aggregator -- plus any number of other columns, each of which becomes a
+ * draggable axis.
+ */
 class DataGrid extends HTMLElement {
     constructor() {
         super();
@@ -68,7 +76,7 @@ class DataGrid extends HTMLElement {
     }
 
     get name() {
-        return this.getAttribute('data-name');
+        return this.dataset.name;
     }
 
     async createTable(fields) {
@@ -90,8 +98,8 @@ class DataGrid extends HTMLElement {
     async initialize() {
         let { dbId } = this;
         if (!dbId) {
-            const filename = `${this.getAttribute('data-db-name')}.sqlite3`;
-            const sourceUrl = this.getAttribute('data-source');
+            const filename = `${this.dataset.dbName}.sqlite3`;
+            const sourceUrl = this.dataset.source;
             if (sourceUrl) {
                 const response = await fetch(sourceUrl);
                 const data = await response.json();  // quirk of /api/contents
@@ -117,7 +125,7 @@ class DataGrid extends HTMLElement {
 
         const axes = this.querySelectorAll('data-grid-axis');
         axes.forEach((axis) => {
-            if (!attrValues.includes(axis.getAttribute('data-name'))) {
+            if (!attrValues.includes(axis.dataset.name)) {
                 axis.remove();
             }
         });
@@ -140,68 +148,14 @@ class DataGrid extends HTMLElement {
         await this.initialize();
 
         const { shadowRoot } = this;
-        const nodes = [this].concat(...shadowRoot.querySelectorAll('.axisContainer'));
+        const refresh = () => this.refresh();
 
-        let dragElement;
-        const placeholder = document.createElement('li');
-        placeholder.classList.add('placeholder');
-        placeholder.innerText = ' ';
+        installDragAndDrop(
+            this,
+            [this, ...shadowRoot.querySelectorAll('.axisContainer')],
+            refresh,
+        );
 
-        const dragLeave = () => {
-            placeholder.remove();
-        }
-
-        const dragOver = (event) => {
-            event.preventDefault();
-            const { clientX, clientY, dataTransfer, target } = event;
-            dataTransfer.dropEffect = 'move';
-
-            if (target.matches('.axisContainer')) {
-                const slot = target.querySelector('slot').getAttribute('name');
-                placeholder.setAttribute('slot', slot);
-                this.appendChild(placeholder);
-            } else if (target.matches('data-grid-axis')) {
-                const slot = target.getAttribute('slot');
-                placeholder.setAttribute('slot', slot);
-                const { bottom, left, right, top } = target.getBoundingClientRect();
-                const next = target === dragElement
-                    ? false
-                    : slot === 'col-axis'
-                        ? (clientX - left) / (right - left) > 0.5
-                        : (clientY - top) / (bottom - top) > 0.5;
-                this.insertBefore(placeholder, next ? target.nextSibling : target);
-            }
-        }
-
-        const drop = (event) => {
-            event.preventDefault();
-
-            nodes.forEach((node) => {
-                node.removeEventListener('dragleave', dragLeave, false);
-                node.removeEventListener('dragover', dragOver, false);
-                node.removeEventListener('drop', drop, false);
-            });
-            dragElement.setAttribute('slot', placeholder.getAttribute('slot'));
-            placeholder.replaceWith(dragElement);
-            this.refresh();
-        }
-
-        const dragStart = ({ dataTransfer, target }) => {
-            dragElement = target;
-            dataTransfer.effectAllowed = 'move'; // eslint-disable-line no-param-reassign
-            dataTransfer.setData('Text', target.textContent);
-
-            nodes.forEach((node) => {
-                node.addEventListener('dragleave', dragLeave, false);
-                node.addEventListener('dragover', dragOver, false);
-                node.addEventListener('drop', drop, false);
-            });
-        }
-
-        nodes.forEach((node) => {
-            node.addEventListener('dragstart', dragStart, false);
-        });
-        const refresh = async () => { await this.refresh(); };
         shadowRoot.querySelector('#aggregator').addEventListener('change', refresh);
         this.addEventListener('refresh', refresh);
         await refresh();
@@ -209,7 +163,7 @@ class DataGrid extends HTMLElement {
     }
 
     async refresh() {
-        const attrName = node => node.getAttribute('data-name');
+        const attrName = node => node.dataset.name;
         const colAttrs = Array.from(this.querySelectorAll('[slot=col-axis]'), attrName);
         const rowAttrs = Array.from(this.querySelectorAll('[slot=row-axis]'), attrName);
         const { shadowRoot } = this;
@@ -222,7 +176,7 @@ class DataGrid extends HTMLElement {
             if (checkBoxes.every(({ checked }) => checked)) {
                 return; // nothing excluded, so no WHERE clause needed
             }
-            filters[valueList.getAttribute('data-name')] = checkBoxes
+            filters[valueList.dataset.name] = checkBoxes
                 .filter(({ checked }) => checked)
                 .map(({ filterValue }) => filterValue);
         });
@@ -230,7 +184,7 @@ class DataGrid extends HTMLElement {
         if (!(await this.columns()).length)
             return this;
         const table = await this.pivotTable({ colAttrs, rowAttrs, aggregator, filters });
-        const lastChild = this.querySelector('[slot=render-area]')
+        const lastChild = this.querySelector('[slot=render-area]');
 
         table.setAttribute('slot', 'render-area');
         if (lastChild) {
@@ -241,23 +195,36 @@ class DataGrid extends HTMLElement {
         return this;
     }
 
+    /**
+     * Load `rows` (arrays ordered like `columns`) into the table.
+     *
+     * One implicit transaction per statement costs an fsync each; wrapping the
+     * whole load in an explicit one is an order of magnitude faster.
+     */
     async bulkInsert(columns, rows) {
         const { name, dbId } = this;
-        const SQLITE_MAX_VARIABLE_NUMBER = 999;
+        const SQLITE_MAX_VARIABLE_NUMBER = 32766; // the default since SQLite 3.32
         const batchSize = Math.floor(SQLITE_MAX_VARIABLE_NUMBER / columns.length);
         const first = `(?${',?'.repeat(columns.length - 1)})`;
         const colList = columns.map(quoteIdent).join(',');
         const insert = `INSERT INTO ${quoteIdent(name)} (${colList}) VALUES ${first}`;
 
-        for (let start = 0; start < rows.length; start += batchSize) {
-            const batch = rows.slice(start, start + batchSize);
-            const sql = `${insert}${`,${first}`.repeat(batch.length - 1)}`;
-            await exec(dbId, sql, batch.flat());
+        await exec(dbId, 'BEGIN');
+        try {
+            for (let start = 0; start < rows.length; start += batchSize) {
+                const batch = rows.slice(start, start + batchSize);
+                const sql = `${insert}${`,${first}`.repeat(batch.length - 1)}`;
+                await exec(dbId, sql, batch.flat());
+            }
+            await exec(dbId, 'COMMIT');
+        } catch (error) {
+            await exec(dbId, 'ROLLBACK');
+            throw error;
         }
         await this.initialize();
-    };
+    }
 
-    pivotTable({ rowAttrs, colAttrs, aggregator, filters }) {
+    async pivotTable({ rowAttrs, colAttrs, aggregator, filters }) {
         const { name, dbId } = this;
         const attrs = rowAttrs.concat(colAttrs).map(quoteIdent).join(', ');
 
@@ -276,38 +243,43 @@ class DataGrid extends HTMLElement {
             ? `SELECT ${attrs}, ${aggregate} FROM ${quoteIdent(name)} WHERE ${where} GROUP BY ${attrs} ORDER BY ${attrs}`
             : `SELECT ${aggregate} FROM ${quoteIdent(name)} WHERE ${where}`;
 
-        const rowKeys = [];
-        const colKeys = [];
-        const values = [];
+        const { rows, columns } = await query(dbId, selectStatement, bind);
 
-        return new Promise((resolve) => promiser('exec', {
-            dbId: dbId,
-            sql: selectStatement,
-            bind,
-            callback({ row, rowNumber, columnNames }) {
-                if (row === undefined && rowNumber === null) {
-                    const table = document.createElement('pivot-table');
-                    table.render({ colAttrs, colKeys, rowAttrs, rowKeys, values });
-                    resolve(table);
-                    return;
-                }
-                const rowKey = rowAttrs.length ? rowAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
-                if (!rowKeys.length || indexedDB.cmp(rowKey, rowKeys[rowKeys.length - 1])) {
-                    rowKeys.push(rowKey);
-                    values.push([]);
-                }
-                const colKey = colAttrs.length ? colAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
-                const index = colKeys.findIndex(key => indexedDB.cmp(key, colKey) > -1);
-                if (index === -1) {
-                    colKeys.push(colKey);
-                } else if (indexedDB.cmp(colKeys[index], colKey)) { // new column
-                    colKeys.splice(index, 0, colKey);
-                    values.forEach(item => item.splice(index, 0, undefined));
-                }
-                const colIdx = index === -1 ? colKeys.length - 1 : index;
-                values[rowKeys.length - 1][colIdx] = row[columnNames.indexOf('value')];
+        // Resolve column positions once rather than per row.
+        const rowPos = rowAttrs.map(attr => columns.indexOf(attr));
+        const colPos = colAttrs.map(attr => columns.indexOf(attr));
+        const valuePos = columns.indexOf('value');
+        const keyOf = (row, positions) => (positions.length
+            ? positions.map(pos => row[pos] ?? 'None')
+            : ['Totals']);
+
+        // ORDER BY makes row keys arrive grouped, but column keys do not, so
+        // collect them first and fill a dense matrix afterwards. Discovering a
+        // column mid-stream used to splice a slot into every row seen so far.
+        const rowKeys = [];
+        const seenCols = new Map(); // serialised key -> key parts
+        const cells = rows.map((row) => {
+            const rowKey = keyOf(row, rowPos);
+            if (!rowKeys.length || indexedDB.cmp(rowKey, rowKeys[rowKeys.length - 1])) {
+                rowKeys.push(rowKey);
             }
-        }));
+            const colKey = keyOf(row, colPos);
+            const id = JSON.stringify(colKey);
+            seenCols.set(id, colKey);
+            return { row: rowKeys.length - 1, col: id, value: row[valuePos] };
+        });
+
+        const sorted = [...seenCols].sort(([, a], [, b]) => indexedDB.cmp(a, b));
+        const offsets = new Map(sorted.map(([id], j) => [id, j]));
+        const colKeys = sorted.map(([, colKey]) => colKey);
+        const values = rowKeys.map(() => new Array(colKeys.length));
+        cells.forEach(({ row, col, value }) => {
+            values[row][offsets.get(col)] = value;
+        });
+
+        const table = document.createElement('pivot-table');
+        table.render({ colAttrs, colKeys, rowAttrs, rowKeys, values });
+        return table;
     }
 }
 
