@@ -21,6 +21,12 @@ Loading a database from `data-source` additionally uses
 [`Uint8Array.fromBase64`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/fromBase64),
 which needs Chrome 133, Firefox 133 or Safari 18.2.
 
+GitHub Pages cannot send those two headers, so the site built by
+`.github/workflows/deploy.yml` is **not** cross-origin isolated and the OPFS
+backend will not start there. Either host it somewhere you control the headers,
+or register a service worker that injects them
+([`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker)).
+
 ## Using Data Grid
 ### HTML5
 ```<data-grid>``` consists of a single

@@ -22,7 +22,9 @@ export async function query(dbId, sql, bind) {
         sql,
         bind,
         callback({ row, columnNames }) {
-            columns = columnNames;
+            if (columnNames) { // absent from the completion sentinel in some versions
+                columns = columnNames;
+            }
             if (row !== undefined) {
                 rows.push(row);
             }

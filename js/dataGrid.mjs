@@ -115,12 +115,14 @@ class DataGrid extends HTMLElement {
             this.dbId = openResponse.dbId;
         }
 
+        const columns = await this.columns();
+        if (!columns.length)
+            return this; // no such table yet, so leave any existing axes alone
+
         // Every non-REAL column is an axis; the REAL `value` column is the measure.
-        const attrValues = (await this.columns())
+        const attrValues = columns
             .filter(({ type }) => type !== 'REAL')
             .map(({ name }) => name);
-        if (!attrValues.length)
-            return this;
 
         const axes = this.querySelectorAll('data-grid-axis');
         axes.forEach((axis) => {
@@ -229,11 +231,20 @@ class DataGrid extends HTMLElement {
 
         const bind = [];
         const clauses = Object.entries(filters).map(([attr, values]) => {
-            if (!values.length) {
+            const column = quoteIdent(attr);
+            const present = values.filter(value => value !== null);
+            const terms = [];
+            if (present.length) {
+                bind.push(...present);
+                terms.push(`${column} IN (${present.map(() => '?').join(', ')})`);
+            }
+            if (present.length < values.length) {
+                terms.push(`${column} IS NULL`); // NULL never matches IN (?)
+            }
+            if (!terms.length) {
                 return '0 = 1'; // SQLite tolerates `IN ()`, but nothing else does
             }
-            bind.push(...values);
-            return `${quoteIdent(attr)} IN (${values.map(() => '?').join(', ')})`;
+            return terms.length > 1 ? `(${terms.join(' OR ')})` : terms[0];
         });
         const where = clauses.length ? clauses.join(' AND ') : '1 = 1';
 

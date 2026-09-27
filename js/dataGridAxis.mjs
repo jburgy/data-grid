@@ -38,6 +38,15 @@ const filterItemTemplate = template`
     </label>
 </p>`;
 
+/**
+ * Identity for one distinct value of a column. SQLite keeps NULL apart from the
+ * text 'null', and a column without affinity keeps the integer 1 apart from the
+ * text '1', so the type has to be part of the key.
+ */
+const valueKey = value => (value === null ? 'null' : `${typeof value}:${value}`);
+
+const displayText = value => (value === null ? '(null)' : String(value));
+
 export class DataGridAxis extends HTMLElement {
     constructor() {
         super();
@@ -110,25 +119,21 @@ export class DataGridAxis extends HTMLElement {
             valueList.appendChild(controls);
         }
 
-        valueList.querySelectorAll('[slot=filter-item]').forEach((node) => {
-            if (!rows.some(([value]) => String(value) === node.dataset.value)) {
-                node.remove();
-            }
-        });
-
         // Rows arrive ORDER BY value, so re-appending each in turn keeps the
         // slotted items sorted without scanning for an insertion point.
         const existing = new Map(Array.from(
             valueList.querySelectorAll('[slot=filter-item]'),
-            node => [node.dataset.value, node],
+            node => [node.dataset.key, node],
         ));
         rows.forEach(([value, valueCount]) => {
-            const key = String(value);
+            const key = valueKey(value);
             let item = existing.get(key);
-            if (!item) {
+            if (item) {
+                existing.delete(key);
+            } else {
                 item = filterItemTemplate.cloneNode(true).firstElementChild;
-                item.dataset.value = key;
-                item.querySelector('.value').textContent = key;
+                item.dataset.key = key;
+                item.querySelector('.value').textContent = displayText(value);
 
                 const checkbox = item.querySelector('input');
                 checkbox.filterValue = value; // raw value, so SQL binding keeps its type
@@ -138,6 +143,7 @@ export class DataGridAxis extends HTMLElement {
             item.querySelector('.count').textContent = `(${valueCount})`;
             valueList.appendChild(item);
         });
+        existing.forEach(node => node.remove()); // values no longer in the table
 
         return valueList;
     }

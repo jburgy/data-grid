@@ -187,7 +187,7 @@ test('orders a numeric axis numerically and does not duplicate it on re-open', a
 
     const first = await page.evaluate(async () => {
         const box = await document.querySelector('[data-name="precinct"]').valueList();
-        return [...box.querySelectorAll('[slot=filter-item]')].map(item => item.dataset.value);
+        return [...box.querySelectorAll('[slot=filter-item] .value')].map(node => node.textContent);
     });
     expect(first).toEqual(['2', '4', '10', '33']); // numeric, not lexicographic
 
@@ -199,7 +199,7 @@ test('orders a numeric axis numerically and does not duplicate it on re-open', a
         await axis.valueList();
         const box = axis.querySelector('filter-box');
         return {
-            values: [...box.querySelectorAll('[slot=filter-item]')].map(item => item.dataset.value),
+            values: [...box.querySelectorAll('[slot=filter-item] .value')].map(node => node.textContent),
             types: [...box.querySelectorAll('[type=checkbox]')].map(node => typeof node.filterValue),
         };
     });
@@ -269,15 +269,7 @@ test('moves an axis by drag and drop', async ({ page }) => {
         fire(container, 'drop');
         const placeholderAfterDrop = Boolean(grid.querySelector('.placeholder'));
 
-        await new Promise((resolve) => { setTimeout(resolve, 500); }); // the drop triggers a refresh
-        return {
-            before,
-            after: axis.getAttribute('slot'),
-            placeholderWhileDragging,
-            placeholderAfterDrop,
-            rowLabels: [...grid.querySelector('pivot-table').shadowRoot
-                .querySelectorAll('th.rowLabel')].map(node => node.textContent),
-        };
+        return { before, after: axis.getAttribute('slot'), placeholderWhileDragging, placeholderAfterDrop };
     });
 
     expect(result).toMatchObject({
@@ -285,8 +277,15 @@ test('moves an axis by drag and drop', async ({ page }) => {
         after: 'row-axis',
         placeholderWhileDragging: true,
         placeholderAfterDrop: false,
-        rowLabels: ['NJ', 'NY'],
     });
+
+    // The drop kicks off a refresh; wait for it rather than sleeping a fixed span.
+    await expect.poll(() => page.evaluate(() => {
+        const table = document.querySelector('data-grid pivot-table');
+        return table
+            ? [...table.shadowRoot.querySelectorAll('th.rowLabel')].map(node => node.textContent)
+            : null;
+    })).toEqual(['NJ', 'NY']);
     expect(errors).toEqual([]);
 });
 
@@ -301,5 +300,68 @@ test('replaces the axis label when data-name changes', async ({ page }) => {
         return axis.shadowRoot.querySelector('#label').textContent;
     });
     expect(label).toBe('renamed');
+    expect(errors).toEqual([]);
+});
+
+test('keeps NULL selectable and distinct from the text "null"', async ({ page }) => {
+    const errors = await openFixture(page);
+    await load(
+        page,
+        { state: 'TEXT', value: 'REAL' },
+        [[null, 1], ['null', 2], ['NY', 4]],
+    );
+
+    // GROUP BY yields three groups; stringifying the key used to merge the
+    // first two into one checkbox.
+    const shown = await page.evaluate(async () => {
+        const box = await document.querySelector('[data-name="state"]').valueList();
+        return [...box.querySelectorAll('[slot=filter-item]')].map(item => ({
+            key: item.dataset.key,
+            text: item.querySelector('.value').textContent,
+        }));
+    });
+    expect(shown).toEqual([
+        { key: 'null', text: '(null)' },
+        { key: 'string:NY', text: 'NY' },
+        { key: 'string:null', text: 'null' },
+    ]);
+
+    // Selecting only the NULL group must keep its row: `IN (?)` can never
+    // match NULL, so it needs an `IS NULL` branch.
+    const kept = await page.evaluate(async () => {
+        const grid = document.querySelector('data-grid');
+        grid.querySelector('[data-name="state"]').setAttribute('slot', 'row-axis');
+        const box = grid.querySelector('[data-name="state"] filter-box');
+        box.querySelectorAll('[type=checkbox]').forEach((node) => {
+            if (node.filterValue !== null) {
+                node.checked = false;
+                node.dispatchEvent(new Event('change'));
+            }
+        });
+        box.shadowRoot.querySelector('#apply').click();
+        await grid.refresh();
+        const shadow = grid.querySelector('pivot-table').shadowRoot;
+        return {
+            labels: [...shadow.querySelectorAll('th.rowLabel')].map(node => node.textContent),
+            cells: [...shadow.querySelectorAll('td.val')].map(cell => cell.textContent),
+        };
+    });
+    expect(kept).toEqual({ labels: ['None'], cells: ['1'] });
+    expect(errors).toEqual([]);
+});
+
+test('prunes axes when the table is replaced by one with no axis columns', async ({ page }) => {
+    const errors = await openFixture(page);
+    await load(page, { state: 'TEXT', county: 'TEXT', value: 'REAL' }, [['NY', 'Kings', 1]]);
+    const before = await page.evaluate(() => [...document.querySelectorAll('data-grid-axis')]
+        .map(axis => axis.dataset.name));
+    expect(before).toEqual(['state', 'county']);
+
+    // The early return used to key off "no axis columns" rather than "no
+    // table", leaving both axes pointing at columns that no longer exist.
+    await load(page, { value: 'REAL' }, [[1]]);
+    const after = await page.evaluate(() => [...document.querySelectorAll('data-grid-axis')]
+        .map(axis => axis.dataset.name));
+    expect(after).toEqual([]);
     expect(errors).toEqual([]);
 });
