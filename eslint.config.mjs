@@ -7,6 +7,7 @@ export default [
             '.venv/**', // a synced virtualenv ships plenty of its own JS
             'src/data_grid/static/**',
             'dist/**',
+            'dist-demo/**',
             'playwright-report/**',
             'test-results/**',
         ],

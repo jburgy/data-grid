@@ -27,3 +27,6 @@ node_modules
 # Yarn cache
 .yarn/
 
+
+# Demo site (published to Pages, not packaged in the wheel)
+dist-demo/

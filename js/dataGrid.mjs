@@ -97,9 +97,18 @@ class DataGrid extends HTMLElement {
 
     async initialize() {
         if (!this.dbId) {
+            // OPFS needs SharedArrayBuffer, so it only exists on a cross-origin
+            // isolated page.  `data-vfs="memdb"` trades persistence for working
+            // anywhere, which is what a static demo page needs.
+            const vfs = this.dataset.vfs || 'opfs';
             const filename = `${this.dataset.dbName}.sqlite3`;
             const sourceUrl = this.dataset.source;
             if (sourceUrl) {
+                if (vfs !== 'opfs') {
+                    // The download lands in OPFS; any other VFS would open an
+                    // unrelated empty database and ignore it.
+                    throw new Error(`data-source requires data-vfs="opfs", got "${vfs}"`);
+                }
                 const response = await fetch(sourceUrl);
                 const data = await response.json();  // quirk of /api/contents
 
@@ -110,7 +119,7 @@ class DataGrid extends HTMLElement {
                 await writable.close();
             }
             const openResponse = await promiser(
-                'open', { filename: `/${filename}`, vfs: 'opfs' }
+                'open', { filename: `/${filename}`, vfs }
             );
             this.dbId = openResponse.dbId;
         }
