@@ -1,3 +1,4 @@
+import { spanSizes } from './spans.mjs';
 import { template } from './template.mjs';
 
 const pivotTableTemplate = template`
@@ -29,68 +30,61 @@ const pivotTableTemplate = template`
     <tbody></tbody>
 </table>`;
 
-const spanSize = (data, i, j) => {
-    const n = j + 1;
-    const arr = data[i].slice(0, n);
-    if (i > 0) {
-        if (!indexedDB.cmp(arr, data[i - 1].slice(0, n))) {
-            return -1; // do not draw cell
-        }
-    }
-    for (let len = 0; i + len < data.length; len += 1) {
-        if (indexedDB.cmp(arr, data[i + len].slice(0, n))) {
-            return len;
-        }
-    }
-    return data.length - i;
-};
+const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 // see https://github.com/nicolaskrutchen/pivottable/tree/master/src/pivot.coffee#pivotTableRenderer
 export class PivotTable extends HTMLElement {
-    constructor({ colAttrs, colKeys, rowAttrs, rowKeys, values }) {
+    constructor() {
         super();
 
         this.attachShadow({ mode: 'open' })
             .appendChild(pivotTableTemplate.cloneNode(true));
+    }
 
+    render({ colAttrs, colKeys, rowAttrs, rowKeys, values }) {
         const table = this.shadowRoot.querySelector('table');
-        const tHead = table.querySelector('thead');
+        const { tHead } = table;
+        const colSpans = spanSizes(colKeys, colAttrs.length);
+        const rowSpans = spanSizes(rowKeys, rowAttrs.length);
 
-        // the first few rows are for column headers
-        colAttrs.forEach((c, j) => {
+        // The first few rows are for column headers. The corner cell, the
+        // deepest column labels and the deepest row labels all overlap the
+        // "row header headers" row below, hence the rowspan/colspan of 2.
+        colAttrs.forEach((colAttr, j) => {
             const row = tHead.insertRow();
             if (j === 0 && rowAttrs.length) {
-                const th = document.createElement('th');
-                th.setAttribute('colspan', rowAttrs.length);
-                th.setAttribute('rowspan', colAttrs.length);
-                row.appendChild(th);
+                const corner = document.createElement('th');
+                corner.setAttribute('colspan', rowAttrs.length);
+                corner.setAttribute('rowspan', colAttrs.length);
+                row.appendChild(corner);
             }
-            const th = document.createElement('th');
-            th.className = 'axisLabel';
-            th.textContent = c;
-            row.appendChild(th);
+            const axisLabel = document.createElement('th');
+            axisLabel.classList.add('axisLabel');
+            axisLabel.textContent = colAttr;
+            row.appendChild(axisLabel);
             colKeys.forEach((colKey, i) => {
-                const span = spanSize(colKeys, i, j);
-                if (span !== -1) {
-                    const th = document.createElement('th'); // eslint-disable-line no-shadow
-                    th.classList.add('colLabel');
-                    th.textContent = colKey[j];
-                    th.setAttribute('colspan', span);
-                    if (j === colAttrs.length - 1 && rowAttrs.length) {
-                        th.setAttribute('rowspan', 2);
-                    }
-                    row.appendChild(th);
+                const span = colSpans[i][j];
+                if (!span) {
+                    return; // an earlier key already covers this cell
                 }
+                const th = document.createElement('th');
+                th.classList.add('colLabel');
+                th.textContent = colKey[j];
+                th.setAttribute('colspan', span);
+                if (j === colAttrs.length - 1 && rowAttrs.length) {
+                    th.setAttribute('rowspan', 2);
+                }
+                row.appendChild(th);
             });
         });
 
         // then a row for row header headers
         if (rowAttrs.length) {
             const row = tHead.insertRow();
-            rowAttrs.forEach((r) => {
+            rowAttrs.forEach((rowAttr) => {
                 const th = document.createElement('th');
                 th.classList.add('axisLabel');
-                th.textContent = r;
+                th.textContent = rowAttr;
                 row.appendChild(th);
             });
             const th = document.createElement('th');
@@ -102,33 +96,33 @@ export class PivotTable extends HTMLElement {
         }
 
         // now the actual data rows, with their row headers and totals
-        const body = document.createElement('tbody');
+        const body = table.tBodies[0];
         rowKeys.forEach((rowKey, i) => {
             const row = body.insertRow();
             rowKey.forEach((txt, j) => {
-                const span = spanSize(rowKeys, i, j);
-                if (span !== -1) {
-                    const th = document.createElement('th');
-                    th.classList.add('rowLabel');
-                    th.textContent = txt;
-                    th.setAttribute('rowspan', span);
-                    if (j === rowAttrs.length - 1 && colAttrs.length) {
-                        th.setAttribute('colspan', 2);
-                    }
-                    row.appendChild(th);
+                const span = rowSpans[i][j];
+                if (!span) {
+                    return;
                 }
+                const th = document.createElement('th');
+                th.classList.add('rowLabel');
+                th.textContent = txt;
+                th.setAttribute('rowspan', span);
+                if (j === rowAttrs.length - 1 && colAttrs.length) {
+                    th.setAttribute('colspan', 2);
+                }
+                row.appendChild(th);
             });
             colKeys.forEach((_colKey, j) => { // this is the tight loop
                 const value = values[i][j];
                 const cell = row.insertCell();
                 cell.classList.add('val', `row${i}`, `col${j}`);
-                cell.textContent = Number.isFinite(value)
-                    ? value.toFixed(0).replace(/\d{1,3}(?=(\d{3})+(?!\d))/g, '$&,')
-                    : value;
+                if (value === undefined || value === null) {
+                    return;
+                }
+                cell.textContent = Number.isFinite(value) ? numberFormat.format(value) : value;
                 cell.setAttribute('data-value', value);
             });
         });
-        table.appendChild(body);
-        return this;
     }
 }

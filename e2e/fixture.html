@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>data-grid test fixture</title>
+    <!--
+      Deliberately bare: no remote dataset, so the end-to-end tests drive the
+      component directly instead of depending on the network (which
+      Cross-Origin-Embedder-Policy would block anyway).
+    -->
+    <script type="module" src="../js/dataGrid.mjs"></script>
+</head>
+
+<body>
+    <data-grid data-name="violations" data-db-name="e2e"></data-grid>
+</body>
+
+</html>

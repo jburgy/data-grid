@@ -2,26 +2,26 @@ import './dataGrid.mjs';
 import './widget.css';
 
 /**
- * @param {Node[]} target 
- * @returns {string[]}
+ * @param {HTMLElement[]} assignedElements
+ * @returns {(string | undefined)[]}
  */
-function getNames(assignedNodes) {
-    return Array.from(assignedNodes, node => node.getAttribute('data-name'))
+function getNames(assignedElements) {
+    return Array.from(assignedElements, node => node.dataset.name);
 }
 
 /**
  * @param {DataGrid} dataGrid
- * @param {HTMLSlotElement} target 
+ * @param {HTMLSlotElement} target
  * @param {string[]} currentChange
  */
 function applyChange(dataGrid, target, currentChange) {
-    const assignedNodes = target.assignedNodes();
-    if (!indexedDB.cmp(getNames(assignedNodes), currentChange)) {
+    const assignedElements = target.assignedElements();
+    if (!indexedDB.cmp(getNames(assignedElements), currentChange)) {
         return; // already consistent
     }
 
     // first, move all nodes from current slot to 'unused-axis'
-    assignedNodes.forEach(node => node.setAttribute('slot', 'unused-axis'));
+    assignedElements.forEach(node => node.setAttribute('slot', 'unused-axis'));
 
     // then, move nodes matching names to the current slot
     // (but don't create new <data-grid-axis> nodes)
@@ -33,11 +33,11 @@ function applyChange(dataGrid, target, currentChange) {
     });
 }
 
-function render({ model, el}) {
+function render({ model, el }) {
     const dataGrid = document.createElement('data-grid');
-    dataGrid.setAttribute('data-name', model.get('table'));
-    dataGrid.setAttribute('data-db-name', model.get('db'));
-    dataGrid.setAttribute('data-source', model.get('source'));
+    dataGrid.dataset.name = model.get('table');
+    dataGrid.dataset.dbName = model.get('db');
+    dataGrid.dataset.source = model.get('source');
 
     const { shadowRoot } = dataGrid;
     shadowRoot.querySelectorAll('slot')
@@ -47,9 +47,9 @@ function render({ model, el}) {
 
             // notify model when slots have changed (via drag and drop)
             slotNode.addEventListener('slotchange', ({ target }) => {
-                const names = getNames(target.assignedNodes());
-                if (names.includes(null)) {
-                    return; // don't notify ondragover
+                const names = getNames(target.assignedElements());
+                if (names.includes(undefined)) {
+                    return; // the drag placeholder has no data-name
                 }
                 model.set(trait, names);
                 model.save_changes();

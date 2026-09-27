@@ -11,7 +11,7 @@ const filterBoxTemplate = template`
         text-align: center;
     }
     h4 { margin: 15px; }
-    label { font-weight: normal };
+    label { font-weight: normal; }
     input[type='checkbox'] { margin-right: 10px; margin-left: 10px; }
     .count { color: gray; font-weight: normal; margin-left: 3px }
     div {
@@ -83,7 +83,7 @@ export class FilterBox extends HTMLElement {
             const changed = this.querySelectorAll('.changed');
             changed.forEach((node) => {
                 node.classList.remove('changed');
-                node.checked = !node.checked; // eslint-disable-line no-param-reassign
+                node.checked = !node.checked;
             });
             this.closeFilterBox();
         });

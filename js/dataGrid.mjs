@@ -1,16 +1,10 @@
-import { sqlite3Worker1Promiser } from '@sqlite.org/sqlite-wasm';
+import { exec, query, promiser, quoteIdent } from './db.mjs';
+import { installDragAndDrop } from './dragDrop.mjs';
 import { template } from './template.mjs';
 import { PivotTable } from './pivotTable.mjs';
 import { FilterSearch } from './filterSearch.mjs';
 import { FilterBox } from './filterBox.mjs';
 import { DataGridAxis } from './dataGridAxis.mjs';
-
-const promiser = await new Promise((resolve) => {
-    const _promiser = sqlite3Worker1Promiser({
-        onready: () => resolve(_promiser),
-    });
-});
-
 
 const dataGridTemplate = template`
 <style>
@@ -66,6 +60,13 @@ const dataGridTemplate = template`
     </tbody>
 </table>`;
 
+/**
+ * A pivot view over one narrow table.
+ *
+ * The table must hold a REAL column named `value` -- the measure fed to the
+ * aggregator -- plus any number of other columns, each of which becomes a
+ * draggable axis.
+ */
 class DataGrid extends HTMLElement {
     constructor() {
         super();
@@ -75,65 +76,57 @@ class DataGrid extends HTMLElement {
     }
 
     get name() {
-        return this.getAttribute('data-name');
+        return this.dataset.name;
     }
 
     async createTable(fields) {
         const { name, dbId } = this;
-        const colDefs = Object.entries(fields).map(([col, type]) => `\`${col}\` ${type}`).join(',');
-        await promiser('exec', { dbId, sql: `DROP TABLE IF EXISTS \`${name}\`` });
-        await promiser('exec', { dbId, sql: `CREATE TABLE \`${name}\` (${colDefs})` });
+        const colDefs = Object.entries(fields)
+            .map(([col, type]) => `${quoteIdent(col)} ${type}`)
+            .join(',');
+        await exec(dbId, `DROP TABLE IF EXISTS ${quoteIdent(name)}`);
+        await exec(dbId, `CREATE TABLE ${quoteIdent(name)} (${colDefs})`);
     }
 
-    schema() {
+    /** `[{ name, type }]`, or `[]` when the table does not exist yet. */
+    async columns() {
         const { name, dbId } = this;
-        const checkExistence = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?";
-
-        return new Promise((resolve) =>
-            promiser('exec', {
-                dbId,
-                sql: checkExistence,
-                bind: [name],
-                callback({ row, columnNames }) {
-                    resolve(row ? row[columnNames.indexOf('sql')] : null)
-                },
-            })
-        );
+        const { rows } = await query(dbId, `PRAGMA table_info(${quoteIdent(name)})`);
+        return rows.map(([, column, type]) => ({ name: column, type: type.toUpperCase() }));
     }
 
     async initialize() {
-        let { dbId } = this;
-        if (!dbId) {
-            const filename = `/${this.getAttribute('data-db-name')}.sqlite3`;
-            const sourceUrl = this.getAttribute('data-source');
+        if (!this.dbId) {
+            const filename = `${this.dataset.dbName}.sqlite3`;
+            const sourceUrl = this.dataset.source;
             if (sourceUrl) {
                 const response = await fetch(sourceUrl);
                 const data = await response.json();  // quirk of /api/contents
 
                 const opfsRoot = await navigator.storage.getDirectory();
-                const fileHandle = await opfsRoot.getFileHandle(filename.slice(1), { create: true });
+                const fileHandle = await opfsRoot.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(Uint8Array.fromBase64(data.content), { position: 0 });
                 await writable.close();
             }
             const openResponse = await promiser(
-                'open', { filename: filename, vfs: 'opfs' }
+                'open', { filename: `/${filename}`, vfs: 'opfs' }
             );
-            this.dbId = dbId = openResponse.dbId;
+            this.dbId = openResponse.dbId;
         }
 
-        const sql = await this.schema();
-        if (!sql)
-            return this;
+        const columns = await this.columns();
+        if (!columns.length)
+            return this; // no such table yet, so leave any existing axes alone
 
-        const [cols] = sql.replace(/\n/g, '').match(/(?<=\().*?(?=\))/);
-        const attrValues = cols
-            .split(/,\s*/)
-            .filter(typedCol => !typedCol.endsWith('REAL'))
-            .map(typedCol => typedCol.match(/(?<=[`"]).*?(?=[`"])/)[0]);
+        // Every non-REAL column is an axis; the REAL `value` column is the measure.
+        const attrValues = columns
+            .filter(({ type }) => type !== 'REAL')
+            .map(({ name }) => name);
+
         const axes = this.querySelectorAll('data-grid-axis');
         axes.forEach((axis) => {
-            if (!attrValues.includes(axis.getAttribute('data-name'))) {
+            if (!attrValues.includes(axis.dataset.name)) {
                 axis.remove();
             }
         });
@@ -156,68 +149,14 @@ class DataGrid extends HTMLElement {
         await this.initialize();
 
         const { shadowRoot } = this;
-        const nodes = [this].concat(...shadowRoot.querySelectorAll('.axisContainer'));
+        const refresh = () => this.refresh();
 
-        let dragElement;
-        const placeholder = document.createElement('li');
-        placeholder.classList.add('placeholder');
-        placeholder.innerText = ' ';
+        installDragAndDrop(
+            this,
+            [this, ...shadowRoot.querySelectorAll('.axisContainer')],
+            refresh,
+        );
 
-        const dragLeave = () => {
-            placeholder.remove();
-        }
-
-        const dragOver = (event) => {
-            event.preventDefault();
-            const { clientX, clientY, dataTransfer, target } = event;
-            dataTransfer.dropEffect = 'move';
-
-            if (target.matches('.axisContainer')) {
-                const slot = target.querySelector('slot').getAttribute('name');
-                placeholder.setAttribute('slot', slot);
-                this.appendChild(placeholder);
-            } else if (target.matches('data-grid-axis')) {
-                const slot = target.getAttribute('slot');
-                placeholder.setAttribute('slot', slot);
-                const { bottom, left, right, top } = target.getBoundingClientRect();
-                const next = target === dragElement
-                    ? false
-                    : slot === 'col-axis'
-                        ? (clientX - left) / (right - left) > 0.5
-                        : (clientY - top) / (bottom - top) > 0.5;
-                this.insertBefore(placeholder, next ? target.nextSibling : target);
-            }
-        }
-
-        const drop = (event) => {
-            event.preventDefault();
-
-            nodes.forEach((node) => {
-                node.removeEventListener('dragleave', dragLeave, false);
-                node.removeEventListener('dragover', dragOver, false);
-                node.removeEventListener('drop', drop, false);
-            });
-            dragElement.setAttribute('slot', placeholder.getAttribute('slot'));
-            placeholder.replaceWith(dragElement);
-            this.refresh();
-        }
-
-        const dragStart = ({ dataTransfer, target }) => {
-            dragElement = target;
-            dataTransfer.effectAllowed = 'move'; // eslint-disable-line no-param-reassign
-            dataTransfer.setData('Text', target.textContent);
-
-            nodes.forEach((node) => {
-                node.addEventListener('dragleave', dragLeave, false);
-                node.addEventListener('dragover', dragOver, false);
-                node.addEventListener('drop', drop, false);
-            });
-        }
-
-        nodes.forEach((node) => {
-            node.addEventListener('dragstart', dragStart, false);
-        });
-        const refresh = async () => { await this.refresh(); };
         shadowRoot.querySelector('#aggregator').addEventListener('change', refresh);
         this.addEventListener('refresh', refresh);
         await refresh();
@@ -225,7 +164,7 @@ class DataGrid extends HTMLElement {
     }
 
     async refresh() {
-        const attrName = node => node.getAttribute('data-name');
+        const attrName = node => node.dataset.name;
         const colAttrs = Array.from(this.querySelectorAll('[slot=col-axis]'), attrName);
         const rowAttrs = Array.from(this.querySelectorAll('[slot=row-axis]'), attrName);
         const { shadowRoot } = this;
@@ -234,20 +173,19 @@ class DataGrid extends HTMLElement {
         const filters = {};
         const valueLists = this.querySelectorAll('[slot=value-list]');
         valueLists.forEach((valueList) => {
-            const checkBoxes = valueList.querySelectorAll('[type=checkbox]');
-            const checkMarks = Array.from(checkBoxes, ({ checked }) => checked);
-
-            if (!checkMarks.every(checked => checked)) {
-                filters[valueList.getAttribute('data-name')] = Array
-                    .from(checkBoxes, node => node.getAttribute('data-filter'))
-                    .filter((_, i) => checkMarks[i]);
+            const checkBoxes = Array.from(valueList.querySelectorAll('[type=checkbox]'));
+            if (checkBoxes.every(({ checked }) => checked)) {
+                return; // nothing excluded, so no WHERE clause needed
             }
+            filters[valueList.dataset.name] = checkBoxes
+                .filter(({ checked }) => checked)
+                .map(({ filterValue }) => filterValue);
         });
 
-        if (!await this.schema())
+        if (!(await this.columns()).length)
             return this;
         const table = await this.pivotTable({ colAttrs, rowAttrs, aggregator, filters });
-        const lastChild = this.querySelector('[slot=render-area]')
+        const lastChild = this.querySelector('[slot=render-area]');
 
         table.setAttribute('slot', 'render-area');
         if (lastChild) {
@@ -258,62 +196,100 @@ class DataGrid extends HTMLElement {
         return this;
     }
 
+    /**
+     * Load `rows` (arrays ordered like `columns`) into the table.
+     *
+     * One implicit transaction per statement costs an fsync each; wrapping the
+     * whole load in an explicit one is an order of magnitude faster.
+     */
     async bulkInsert(columns, rows) {
         const { name, dbId } = this;
-        const SQLITE_MAX_VARIABLE_NUMBER = 999;
+        const SQLITE_MAX_VARIABLE_NUMBER = 32766; // the default since SQLite 3.32
         const batchSize = Math.floor(SQLITE_MAX_VARIABLE_NUMBER / columns.length);
         const first = `(?${',?'.repeat(columns.length - 1)})`;
-        const next = `,${first}`;
-        const insert = `INSERT INTO \`${name}\` (${columns.map(col => `\`${col}\``).join(',')}) VALUES ${first}`;
+        const colList = columns.map(quoteIdent).join(',');
+        const insert = `INSERT INTO ${quoteIdent(name)} (${colList}) VALUES ${first}`;
 
-        while (true) {
-            const batch = rows.splice(0, batchSize);
-            const { length } = batch;
-            if (!length)
-                break;
-            await promiser('exec', { dbId, sql: `${insert}${next.repeat(length - 1)}`, bind: batch.flat() });
+        await exec(dbId, 'BEGIN');
+        try {
+            for (let start = 0; start < rows.length; start += batchSize) {
+                const batch = rows.slice(start, start + batchSize);
+                const sql = `${insert}${`,${first}`.repeat(batch.length - 1)}`;
+                await exec(dbId, sql, batch.flat());
+            }
+            await exec(dbId, 'COMMIT');
+        } catch (error) {
+            await exec(dbId, 'ROLLBACK');
+            throw error;
         }
         await this.initialize();
-    };
+    }
 
-    pivotTable({ rowAttrs, colAttrs, aggregator, filters }) {
+    async pivotTable({ rowAttrs, colAttrs, aggregator, filters }) {
         const { name, dbId } = this;
-        const attrs = rowAttrs.concat(colAttrs).map(attr => `\`${attr}\``).join(', ');
-        const filter = Object.entries(filters)
-            .reduce((a, [attr, values]) => `${a} AND \`${attr}\` IN (${values.join(', ')})`, '1 = 1');
-        const selectStatement = attrs.length
-            ? `SELECT ${attrs}, ${aggregator}(value) AS value FROM \`${name}\` WHERE ${filter} GROUP BY ${attrs} ORDER BY ${attrs}`
-            : `SELECT ${aggregator}(value) AS value FROM \`${name}\` WHERE ${filter}`;
+        const attrs = rowAttrs.concat(colAttrs).map(quoteIdent).join(', ');
 
-        const rowKeys = [];
-        const colKeys = [];
-        const values = [];
-
-        return new Promise((resolve) => promiser('exec', {
-            dbId: dbId,
-            sql: selectStatement,
-            callback({ row, rowNumber, columnNames }) {
-                if (row === undefined && rowNumber === null) {
-                    resolve(new PivotTable({ colAttrs, colKeys, rowAttrs, rowKeys, values }));
-                    return;
-                }
-                const rowKey = rowAttrs.length ? rowAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
-                if (!rowKeys.length || indexedDB.cmp(rowKey, rowKeys[rowKeys.length - 1])) {
-                    rowKeys.push(rowKey);
-                    values.push([]);
-                }
-                const colKey = colAttrs.length ? colAttrs.map(attr => row[columnNames.indexOf(attr)] ?? 'None') : ['Totals'];
-                const index = colKeys.findIndex(key => indexedDB.cmp(key, colKey) > -1);
-                if (index === -1) {
-                    colKeys.push(colKey);
-                } else if (indexedDB.cmp(colKeys[index], colKey)) { // new column
-                    colKeys.splice(index, 0, colKey);
-                    values.forEach(item => item.splice(index, 0, undefined));
-                }
-                const colIdx = index === -1 ? colKeys.length - 1 : index;
-                values[rowKeys.length - 1][colIdx] = row[columnNames.indexOf('value')];
+        const bind = [];
+        const clauses = Object.entries(filters).map(([attr, values]) => {
+            const column = quoteIdent(attr);
+            const present = values.filter(value => value !== null);
+            const terms = [];
+            if (present.length) {
+                bind.push(...present);
+                terms.push(`${column} IN (${present.map(() => '?').join(', ')})`);
             }
-        }));
+            if (present.length < values.length) {
+                terms.push(`${column} IS NULL`); // NULL never matches IN (?)
+            }
+            if (!terms.length) {
+                return '0 = 1'; // SQLite tolerates `IN ()`, but nothing else does
+            }
+            return terms.length > 1 ? `(${terms.join(' OR ')})` : terms[0];
+        });
+        const where = clauses.length ? clauses.join(' AND ') : '1 = 1';
+
+        const aggregate = `${aggregator}(value) AS value`;
+        const selectStatement = attrs.length
+            ? `SELECT ${attrs}, ${aggregate} FROM ${quoteIdent(name)} WHERE ${where} GROUP BY ${attrs} ORDER BY ${attrs}`
+            : `SELECT ${aggregate} FROM ${quoteIdent(name)} WHERE ${where}`;
+
+        const { rows, columns } = await query(dbId, selectStatement, bind);
+
+        // Resolve column positions once rather than per row.
+        const rowPos = rowAttrs.map(attr => columns.indexOf(attr));
+        const colPos = colAttrs.map(attr => columns.indexOf(attr));
+        const valuePos = columns.indexOf('value');
+        const keyOf = (row, positions) => (positions.length
+            ? positions.map(pos => row[pos] ?? 'None')
+            : ['Totals']);
+
+        // ORDER BY makes row keys arrive grouped, but column keys do not, so
+        // collect them first and fill a dense matrix afterwards. Discovering a
+        // column mid-stream used to splice a slot into every row seen so far.
+        const rowKeys = [];
+        const seenCols = new Map(); // serialised key -> key parts
+        const cells = rows.map((row) => {
+            const rowKey = keyOf(row, rowPos);
+            if (!rowKeys.length || indexedDB.cmp(rowKey, rowKeys[rowKeys.length - 1])) {
+                rowKeys.push(rowKey);
+            }
+            const colKey = keyOf(row, colPos);
+            const id = JSON.stringify(colKey);
+            seenCols.set(id, colKey);
+            return { row: rowKeys.length - 1, col: id, value: row[valuePos] };
+        });
+
+        const sorted = [...seenCols].sort(([, a], [, b]) => indexedDB.cmp(a, b));
+        const offsets = new Map(sorted.map(([id], j) => [id, j]));
+        const colKeys = sorted.map(([, colKey]) => colKey);
+        const values = rowKeys.map(() => new Array(colKeys.length));
+        cells.forEach(({ row, col, value }) => {
+            values[row][offsets.get(col)] = value;
+        });
+
+        const table = document.createElement('pivot-table');
+        table.render({ colAttrs, colKeys, rowAttrs, rowKeys, values });
+        return table;
     }
 }
 
