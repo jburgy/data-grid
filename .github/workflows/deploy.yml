@@ -24,6 +24,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test:unit
+      - run: npm run build
+      # The `demo` playwright project runs against the built demo site, so it has
+      # to exist before the e2e run.
+      - run: npm run build:demo
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7
@@ -34,7 +38,6 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
-      - run: npm run build
 
       # DataGridWidget._esm points at the bundle above, so the package cannot be
       # imported until it exists.  Without this, nothing verified uv.lock at all.
@@ -46,7 +49,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: src/data_grid/static
+          path: dist-demo
 
   deploy:
     needs: build

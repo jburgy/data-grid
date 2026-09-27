@@ -97,6 +97,10 @@ class DataGrid extends HTMLElement {
 
     async initialize() {
         if (!this.dbId) {
+            // OPFS needs SharedArrayBuffer, so it only exists on a cross-origin
+            // isolated page.  `data-vfs="memdb"` trades persistence for working
+            // anywhere, which is what a static demo page needs.
+            const vfs = this.dataset.vfs || 'opfs';
             const filename = `${this.dataset.dbName}.sqlite3`;
             const sourceUrl = this.dataset.source;
             if (sourceUrl) {
@@ -110,7 +114,7 @@ class DataGrid extends HTMLElement {
                 await writable.close();
             }
             const openResponse = await promiser(
-                'open', { filename: `/${filename}`, vfs: 'opfs' }
+                'open', { filename: `/${filename}`, vfs }
             );
             this.dbId = openResponse.dbId;
         }

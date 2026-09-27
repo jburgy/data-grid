@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Data Grid &mdash; PyScript demo</title>
+
+    <link rel="stylesheet" href="https://pyscript.net/releases/2026.7.3/core.css">
+    <script type="module" src="https://pyscript.net/releases/2026.7.3/core.js"></script>
+    <script type="module" src="../js/dataGrid.mjs"></script>
+
+    <style>
+        body {
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            margin: 2rem;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <h1><code>&lt;data-grid&gt;</code> driven from Python</h1>
+    <p id="status">Loading Python&hellip;</p>
+
+    <!--
+      memdb rather than opfs: OPFS needs SharedArrayBuffer, which needs COOP/COEP,
+      which GitHub Pages cannot send.  The data is rebuilt on every load anyway.
+    -->
+    <data-grid data-name="violations" data-db-name="pyscript" data-vfs="memdb"></data-grid>
+
+    <script type="py" config='{"packages": ["pandas"]}'>
+        import json
+
+        from pyodide.ffi import to_js
+        from pyodide.http import pyfetch
+        from pyscript import document, window
+        import pandas as pd
+
+        status = document.querySelector("#status")
+        grid = document.querySelector("data-grid")
+
+
+        def say(message):
+            status.textContent = message
+
+
+        # `dbId` is set by DataGrid.initialize(); until then the element is not
+        # ready to be driven.  PyScript may well start before that resolves.
+        say("Waiting for the sqlite worker…")
+        await window.customElements.whenDefined("data-grid")
+        while grid.dbId is None:
+            await window.setTimeout_async(50)
+
+        say("Fetching the NYC open parking violations dataset…")
+        response = await pyfetch("https://data.cityofnewyork.us/resource/uvbq-3m68.json")
+        frame = pd.DataFrame(json.loads(await response.text()))
+
+        # Reshape wide -> narrow: <data-grid> aggregates a single REAL `value`
+        # column, so the four *_amount columns become rows tagged by amount_type.
+        amounts = [c for c in frame.columns if c.endswith("_amount")]
+        # summons_image is a URL and amount_due is itself a measure, so neither
+        # makes a useful axis.
+        dropped = {*amounts, "summons_image", "amount_due"}
+        shared = [c for c in frame.columns if c not in dropped]
+        narrow = frame.melt(
+            id_vars=shared,
+            value_vars=amounts,
+            var_name="amount_type",
+            value_name="value",
+        )
+        narrow["value"] = pd.to_numeric(narrow["value"], errors="coerce").fillna(0.0)
+
+        fields = {column: "TEXT" for column in shared}
+        fields["amount_type"] = "TEXT"
+        fields["value"] = "REAL"
+
+        say(f"Loading {len(narrow):,} rows into sqlite…")
+        await grid.createTable(to_js(fields, dict_converter=window.Object.fromEntries))
+        await grid.bulkInsert(
+            to_js(list(fields)),
+            to_js(narrow[list(fields)].astype({"value": float}).values.tolist()),
+        )
+
+        # Land on something worth looking at rather than a single grand total.
+        grid.querySelector('[data-name="county"]').setAttribute("slot", "row-axis")
+        grid.querySelector('[data-name="amount_type"]').setAttribute("slot", "col-axis")
+        await grid.refresh()
+
+        say(f"{len(narrow):,} rows. Drag the attribute chips between the row and column axes.")
+    </script>
+</body>
+
+</html>
