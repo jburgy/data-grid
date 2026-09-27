@@ -59,7 +59,16 @@ Testing `DataGridWidget` is unfortunately finicky because of
 One approach is to run [`jupyter lab`](https://jupyter.org/try#jupyterlab)
 and [Vite](https://vite.dev) side-by-side and leverage Vite's
 [`server.proxy`](https://vite.dev/config/server-options.html#server-proxy) to
-route most request to jupyter.  This requires editing `jupyter_lab_config.py`:
+route most request to jupyter.
+
+JupyterLab is a tool this project is developed *against*, not something it
+imports, so it is deliberately not a locked dependency — run it on demand and
+you get a current version rather than whatever this repository last pinned:
+```sh
+uv run --with jupyterlab jupyter lab
+```
+
+This requires editing `jupyter_lab_config.py`:
 ```python
 ## Set the Access-Control-Allow-Origin header
 #  
