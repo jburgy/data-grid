@@ -27,7 +27,7 @@
         "test": "npm run test:unit && npm run test:e2e",
         "test:unit": "npx vitest run",
         "test:e2e": "npm run build:demo && npx playwright test",
-        "build:demo": "npx vite build --config vite.demo.config.mjs"
+        "build:demo": "npm run build && npx vite build --config vite.demo.config.mjs"
     },
     "devDependencies": {
         "@anywidget/vite": "^0.2.2",
