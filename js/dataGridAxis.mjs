@@ -1,3 +1,4 @@
+import { promiser } from './db.mjs';
 import { template } from './template.mjs';
 
 const dataGridAxisTemplate = template`
@@ -76,7 +77,7 @@ export class DataGridAxis extends HTMLElement {
         });
 
         this.addEventListener('refresh', () => {
-            const checkboxes = Array.from(this.querySelectorAll('[type=checkbo]'), node => node.checked);
+            const checkboxes = Array.from(this.querySelectorAll('[type=checkbox]'), node => node.checked);
             const { classList } = shadowRoot.querySelector('.attribute');
             if (checkboxes.every(checked => checked) === classList.contains('filtered')) {
                 classList.toggle('filtered');

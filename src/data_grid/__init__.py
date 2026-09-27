@@ -1,25 +1,26 @@
+import os
 from pathlib import Path
 
 from anywidget import AnyWidget
-from traitlets import Unicode, List
+from traitlets import List, Unicode
 
+_STATIC = Path(__file__).parent / "static"
 
-_DEV = True # switch to False for production
-
-if _DEV:
-    # from `npx vite`
-    ESM = "http://localhost:5173/js/widget.js?anywidget"
-    CSS = ""
-else:
-    # from `npx vite build`
-    bundler_output_dir = Path(__file__).parent / "static"
-    ESM = (bundler_output_dir / "widget.js").read_text()
-    CSS = (bundler_output_dir / "widget.css").read_text()
+if os.environ.get("DATA_GRID_DEV"):  # served by `npx vite`
+    _ESM = "http://localhost:5173/js/widget.mjs?anywidget"
+    _CSS = ""
+else:  # emitted by `npx vite build`
+    # Paths (rather than inlined text) let anywidget serve the lazily imported
+    # sqlite-wasm chunks that sit next to widget.mjs.
+    _ESM = _STATIC / "widget.mjs"
+    _CSS = _STATIC / "widget.css"
+    if not _CSS.exists():  # vite omits the stylesheet while widget.css is empty
+        _CSS = ""
 
 
 class DataGridWidget(AnyWidget):
-    _esm = ESM
-    _css = CSS
+    _esm = _ESM
+    _css = _CSS
     table = Unicode().tag(sync=True)
     db = Unicode().tag(sync=True)
     source = Unicode().tag(sync=True)
@@ -27,8 +28,5 @@ class DataGridWidget(AnyWidget):
     col_axis = List(Unicode()).tag(sync=True)
     row_axis = List(Unicode()).tag(sync=True)
 
-    def __init__(self, table: str, db: str, source: str = ""):
-        super().__init__()
-        self.table = table
-        self.db = db
-        self.source = source
+    def __init__(self, table: str, db: str, source: str = "", **kwargs):
+        super().__init__(table=table, db=db, source=source, **kwargs)

@@ -1,16 +1,9 @@
-import { sqlite3Worker1Promiser } from '@sqlite.org/sqlite-wasm';
+import { promiser } from './db.mjs';
 import { template } from './template.mjs';
 import { PivotTable } from './pivotTable.mjs';
 import { FilterSearch } from './filterSearch.mjs';
 import { FilterBox } from './filterBox.mjs';
 import { DataGridAxis } from './dataGridAxis.mjs';
-
-const promiser = await new Promise((resolve) => {
-    const _promiser = sqlite3Worker1Promiser({
-        onready: () => resolve(_promiser),
-    });
-});
-
 
 const dataGridTemplate = template`
 <style>

@@ -40,7 +40,7 @@ export class FilterSearch extends HTMLElement {
             const nodes = valueList.querySelectorAll('[slot=filter-item] #value');
             nodes.forEach((node) => {
                 const { style } = node.closest('[slot=filter-item]');
-                const { textContent } = node;
+                const textContent = node.textContent.toLowerCase();
                 style.setProperty('display', textContent.includes(filter) ? '' : 'none');
             });
         });
