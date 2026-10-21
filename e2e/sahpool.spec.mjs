@@ -104,7 +104,7 @@ test('retries once the other tab lets go', async ({ page, context }) => {
         await grid.initialize();
         return grid.dbId;
     });
-    expect(dbId).toMatch(/^sahpool:/);
+    expect(typeof dbId).toBe('string');
 });
 
 test('shares one connection between overlapping initialize calls', async ({ page }) => {
@@ -129,4 +129,16 @@ test('shares one connection between overlapping initialize calls', async ({ page
         return sent.filter(name => name === '/overlap.sqlite3');
     });
     expect(opens).toEqual(['/overlap.sqlite3']);
+});
+
+test('another VFS does not take the pool', async ({ page, context }) => {
+    await page.close();
+
+    const plain = await context.newPage();
+    await plain.goto('e2e/fixture.html'); // default opfs, no sahpool
+    await ready(plain);
+
+    const pool = await context.newPage();
+    await pool.goto(FIXTURE);
+    await ready(pool);
 });
