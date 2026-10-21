@@ -16,6 +16,7 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: { input: resolve(import.meta.dirname, 'examples/pyscript.html') },
     },
+    worker: { format: 'es' },
     optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
     plugins: [{
         name: 'demo-as-index',
