@@ -5,9 +5,10 @@ export default defineConfig({
 	base: "/data-grid/",
 	build: {
 		outDir: "src/data_grid/static",
-		lib: {
-			entry: ["js/widget.mjs"],
-			formats: ["es"],
+		rollupOptions: {
+			input: "js/widget.mjs",
+			preserveEntrySignatures: "strict",
+			output: { entryFileNames: "widget.mjs" },
 		},
 	},
 	worker: { format: 'es' },

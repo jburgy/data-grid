@@ -18,6 +18,16 @@ export default defineConfig({
     },
     worker: { format: 'es' },
     optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+    // `ISOLATE=1 vite preview` serves the built widget on a cross-origin
+    // isolated page, which is what the plain opfs VFS needs (see e2e/widget.spec.mjs).
+    preview: process.env.ISOLATE
+        ? {
+            headers: {
+                'Cross-Origin-Opener-Policy': 'same-origin',
+                'Cross-Origin-Embedder-Policy': 'require-corp',
+            },
+        }
+        : {},
     plugins: [{
         name: 'demo-as-index',
         closeBundle: async () => {

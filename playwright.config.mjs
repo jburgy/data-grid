@@ -2,8 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 5174; // not 5173, so a dev server you already have open is left alone
 const DEMO_PORT = 5176;
+const ISOLATED_DEMO_PORT = 5177;
 const baseURL = `http://localhost:${PORT}/data-grid/`;
 const demoURL = `http://localhost:${DEMO_PORT}/data-grid/`;
+const isolatedDemoURL = `http://localhost:${ISOLATED_DEMO_PORT}/data-grid/`;
 
 export default defineConfig({
     testDir: 'e2e',
@@ -16,7 +18,7 @@ export default defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: 'pyscript.spec.mjs',
+            testIgnore: ['pyscript.spec.mjs', 'widget.spec.mjs'],
             use: { ...devices['Desktop Chrome'], baseURL },
         },
         {
@@ -25,6 +27,12 @@ export default defineConfig({
             name: 'demo',
             testMatch: 'pyscript.spec.mjs',
             use: { ...devices['Desktop Chrome'], baseURL: demoURL },
+        },
+        {
+            // The built widget on an isolated page, so the plain opfs VFS can run.
+            name: 'widget',
+            testMatch: 'widget.spec.mjs',
+            use: { ...devices['Desktop Chrome'], baseURL: isolatedDemoURL },
         },
     ],
     webServer: [
@@ -39,6 +47,13 @@ export default defineConfig({
         {
             command: `npx vite preview --config vite.demo.config.mjs --port ${DEMO_PORT} --strictPort`,
             url: demoURL,
+            reuseExistingServer: !process.env.CI,
+            stdout: 'pipe',
+        },
+        {
+            command: `npx vite preview --config vite.demo.config.mjs --port ${ISOLATED_DEMO_PORT} --strictPort`,
+            env: { ISOLATE: '1' },
+            url: isolatedDemoURL,
             reuseExistingServer: !process.env.CI,
             stdout: 'pipe',
         },
