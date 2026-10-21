@@ -34,15 +34,22 @@ Loading a database from `data-source` additionally uses
 which needs Chrome 133, Firefox 133 or Safari 18.2.
 
 GitHub Pages cannot send those two headers. Where you cannot control them, set
+`data-vfs="opfs-sahpool"` to keep persistence without isolation, or
 `data-vfs="memdb"` to keep the database in memory &mdash; you lose persistence
-across reloads but need no isolation at all, which is how the demo above runs.
+across reloads but need no setup at all, which is how the demo above runs.
 The alternative is a service worker that injects the headers
 ([`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker)).
 
-| `data-vfs` | persists | needs COOP/COEP |
-| --- | --- | --- |
-| `opfs` (default) | yes | yes |
-| `memdb` | no | no |
+`opfs-sahpool` holds an exclusive lock on its files, so only one tab of an origin can
+use it at a time; a second tab fails after about three seconds with an error that
+says so. It cannot load `data-source`, and its files are not visible under their own
+names in OPFS.
+
+| `data-vfs` | persists | needs COOP/COEP | tabs per origin |
+| --- | --- | --- | --- |
+| `opfs` (default) | yes | yes | many |
+| `opfs-sahpool` | yes | no | one |
+| `memdb` | no | no | many |
 
 
 ## Using Data Grid

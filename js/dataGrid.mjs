@@ -1,4 +1,4 @@
-import { exec, query, promiser, quoteIdent } from './db.mjs';
+import { exec, query, open, quoteIdent } from './db.mjs';
 import { installDragAndDrop } from './dragDrop.mjs';
 import { template } from './template.mjs';
 import { PivotTable } from './pivotTable.mjs';
@@ -95,33 +95,42 @@ class DataGrid extends HTMLElement {
         return rows.map(([, column, type]) => ({ name: column, type: type.toUpperCase() }));
     }
 
+    /** Resolves to a new `dbId`; `initialize()` makes sure it only runs once at a time. */
+    async openDatabase() {
+        // opfs needs SharedArrayBuffer, so it only exists on a cross-origin
+        // isolated page.  opfs-sahpool persists without isolation but allows
+        // one tab at a time; `data-vfs="memdb"` works anywhere and keeps
+        // nothing, which is what a static demo page needs.
+        const vfs = this.dataset.vfs || 'opfs';
+        const filename = `${this.dataset.dbName}.sqlite3`;
+        const sourceUrl = this.dataset.source;
+        if (sourceUrl) {
+            if (vfs !== 'opfs') {
+                // The download lands in OPFS; any other VFS would open an
+                // unrelated empty database and ignore it.
+                throw new Error(`data-source requires data-vfs="opfs", got "${vfs}"`);
+            }
+            const response = await fetch(sourceUrl);
+            const data = await response.json();  // quirk of /api/contents
+
+            const opfsRoot = await navigator.storage.getDirectory();
+            const fileHandle = await opfsRoot.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(Uint8Array.fromBase64(data.content), { position: 0 });
+            await writable.close();
+        }
+        return open({ filename: `/${filename}`, vfs });
+    }
+
     async initialize() {
         if (!this.dbId) {
-            // OPFS needs SharedArrayBuffer, so it only exists on a cross-origin
-            // isolated page.  `data-vfs="memdb"` trades persistence for working
-            // anywhere, which is what a static demo page needs.
-            const vfs = this.dataset.vfs || 'opfs';
-            const filename = `${this.dataset.dbName}.sqlite3`;
-            const sourceUrl = this.dataset.source;
-            if (sourceUrl) {
-                if (vfs !== 'opfs') {
-                    // The download lands in OPFS; any other VFS would open an
-                    // unrelated empty database and ignore it.
-                    throw new Error(`data-source requires data-vfs="opfs", got "${vfs}"`);
-                }
-                const response = await fetch(sourceUrl);
-                const data = await response.json();  // quirk of /api/contents
-
-                const opfsRoot = await navigator.storage.getDirectory();
-                const fileHandle = await opfsRoot.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(Uint8Array.fromBase64(data.content), { position: 0 });
-                await writable.close();
-            }
-            const openResponse = await promiser(
-                'open', { filename: `/${filename}`, vfs }
-            );
-            this.dbId = openResponse.dbId;
+            // refresh() can arrive while the first open is still pending. A
+            // second connection to the same file is unsafe on opfs-sahpool, so
+            // share one attempt, and forget it afterwards so a failure can be retried.
+            this.opening ??= this.openDatabase()
+                .then((dbId) => { this.dbId = dbId; })
+                .finally(() => { this.opening = undefined; });
+            await this.opening;
         }
 
         const columns = await this.columns();

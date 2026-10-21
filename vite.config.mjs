@@ -10,6 +10,7 @@ export default defineConfig({
 			formats: ["es"],
 		},
 	},
+	worker: { format: 'es' },
 	optimizeDeps: {
 		exclude: ['@sqlite.org/sqlite-wasm'],
 	},
