@@ -39,7 +39,7 @@ jobs:
 
       # DataGridWidget._esm points at the bundle above, so the package cannot be
       # imported until it exists.  Without this, nothing verified uv.lock at all.
-      - uses: astral-sh/setup-uv@v10.2.0 # no moving major tag is published
+      - uses: astral-sh/setup-uv@v10.3.3 # no moving major tag is published
         with:
           enable-cache: true
       - run: uv sync --locked
